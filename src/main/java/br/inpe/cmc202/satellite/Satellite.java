@@ -92,7 +92,7 @@ public class Satellite {
 	 * the desired direction (it does not know the current attitude - only two
 	 * vectors in the body frame).
 	 */
-	private boolean modeUsingAttitude = true;
+	private boolean modeUsingAttitude = false;
 
 	// to store the target attitude in ECI
 	private Rotation targetQuaternion = null;

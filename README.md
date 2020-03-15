@@ -1,6 +1,6 @@
 # README for Satellite Simulator
 
-    Copyright 2017 Alessandro Gerlinger Romero
+    Copyright 2020 Alessandro Gerlinger Romero
 
     This file is part of Satellite Simulator.
 
@@ -27,3 +27,8 @@ Alessandro Gerlinger Romero
 Original files are available at: http://urlib.net/rep/8JMKD3MGP3W34R/3SNSQ7L
 
 
+# Original Developer Guide
+Original developer guide is available at: 
+  - https://www.researchgate.net/publication/338986192_Satellite_Simulation_Developer's_Guide_-_Attitude_Dynamics_and_Control_of_Nonlinear_Satellite_Simulations
+  - http://mtc-m21c.sid.inpe.br/col/sid.inpe.br/mtc-m21c/2019/11.11.10.41/doc/publicacao.pdf
+  
