@@ -1,4 +1,4 @@
-#README for Satellite Simulator
+# README for Satellite Simulator
 
     Copyright 2017 Alessandro Gerlinger Romero
 
