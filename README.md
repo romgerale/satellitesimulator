@@ -17,7 +17,10 @@
     You should have received a copy of the GNU General Public License
     along with Satellite Simulator. If not, see <http://www.gnu.org/licenses/>.
 
-March, 2020, Sao Jose dos Campos, Brazil
+March, 2020
+
+Sao Jose dos Campos, Brazil
+
 Alessandro Gerlinger Romero
 
 # Original files
