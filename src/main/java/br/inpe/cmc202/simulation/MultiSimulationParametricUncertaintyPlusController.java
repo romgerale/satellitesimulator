@@ -28,21 +28,29 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * @author alessandro.g.romero
  * 
  */
-public class MultiSimulationParametricUncertaintyController implements Runnable {
+public class MultiSimulationParametricUncertaintyPlusController implements Runnable {
 
 	// IACLAW - 2020
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
-			Arrays.asList("ProportionalNonLinearQuaternionFullSDREHInfinityController"));
-	//Arrays.asList("ProportionalNonLinearQuaternionSDREController_GIBBS",
-	//		"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+			Arrays.asList("ProportionalNonLinearQuaternionSDREController_GIBBS",
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 
-	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationParametricUncertaintyController.class);
+	static final private Logger logger = LoggerFactory
+			.getLogger(MultiSimulationParametricUncertaintyPlusController.class);
 
 	// standard deviation
 	private static final double STD = 0.025d;
 
 	// range for uniform distribution
 	private static final double RANGE = 0.2d;
+
+	// MONTE CARLO PARAMETERS - UNIFORM
+	// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
+	// IAALACW - 2020
+	private static final double LOWER_ANGLE = -180d;
+	private static final double UPPER_ANGLE = 180d;
+	private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
+	private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
@@ -52,10 +60,18 @@ public class MultiSimulationParametricUncertaintyController implements Runnable 
 	 * @param monteCarlo
 	 * @throws OrekitException
 	 */
-	public MultiSimulationParametricUncertaintyController(int numberOfSimulations) throws OrekitException {
+	public MultiSimulationParametricUncertaintyPlusController(int numberOfSimulations) throws OrekitException {
 		logger.info("Configuring multi simulation... NumberOfTrials: {}", numberOfSimulations);
 
 		RandomDataGenerator inertiaTensorRandom = new RandomDataGenerator();
+
+		RandomDataGenerator gaussianAnglesX = new RandomDataGenerator();
+		RandomDataGenerator gaussianAnglesY = new RandomDataGenerator();
+		RandomDataGenerator gaussianAnglesZ = new RandomDataGenerator();
+
+		RandomDataGenerator gaussianVelocityX = new RandomDataGenerator();
+		RandomDataGenerator gaussianVelocityY = new RandomDataGenerator();
+		RandomDataGenerator gaussianVelocityZ = new RandomDataGenerator();
 
 		for (int i = 1; i <= numberOfSimulations; i++) {
 
@@ -63,9 +79,24 @@ public class MultiSimulationParametricUncertaintyController implements Runnable 
 			// final Properties inertiaTensor =
 			// calculateInertiaTensorUsingNormal(inertiaTensorRandom);
 
+			double[] initialAttitudeEulerAngles = new double[] { gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
+					gaussianAnglesY.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
+					gaussianAnglesZ.nextUniform(LOWER_ANGLE, UPPER_ANGLE) };
+
+			double[] initialAngularVelocity = new double[] {
+					gaussianVelocityX.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY),
+					gaussianVelocityY.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY),
+					gaussianVelocityZ.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY) };
+
+			logger.info("Monte Carlo iteration - Euler Angles: {} {} {}", initialAttitudeEulerAngles[0],
+					initialAttitudeEulerAngles[1], initialAttitudeEulerAngles[2]);
+			logger.info("Monte Carlo iteration - Angular Velocity: {} {} {}", initialAngularVelocity[0],
+					initialAngularVelocity[1], initialAngularVelocity[2]);
+
 			// CONTROLLERS
 			for (String controller : CONTROLLERS) {
-				SimulationController s = new SimulationController(controller, inertiaTensor);
+				SimulationController s = new SimulationController(controller, inertiaTensor, initialAttitudeEulerAngles,
+						initialAngularVelocity);
 				listSimulations.add(s);
 				List<SimulationController> l = mapSimulations.get(controller);
 				if (l == null) {
@@ -202,7 +233,7 @@ public class MultiSimulationParametricUncertaintyController implements Runnable 
 			Plotter.plot2DLine(detControllability, key + " detControllability");
 			Plotter.plot2DLine(reactionWheelAngularVelocity, key, "reaction wheel angular velocity", details);
 			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + "reactionWheelAngularMomentum");
-			Plotter.plot2DLine(gama, key + " gamma");
+			Plotter.plot2DLine(gama, key + " gama");
 		}
 	}
 
@@ -214,16 +245,15 @@ public class MultiSimulationParametricUncertaintyController implements Runnable 
 	 */
 	public static void main(String[] args) throws OrekitException {
 		logger.info("**********************************");
-		logger.info("Satellite Multi Simulation "
-				+ (MultiSimulationParametricUncertaintyController.class.getPackage().getImplementationVersion() == null
-						? ""
-						: MultiSimulationParametricUncertaintyController.class.getPackage()
+		logger.info("Satellite Multi Simulation " + (MultiSimulationParametricUncertaintyPlusController.class
+				.getPackage().getImplementationVersion() == null ? ""
+						: MultiSimulationParametricUncertaintyPlusController.class.getPackage()
 								.getImplementationVersion()));
 		logger.info("**********************************");
 
 		if (args.length > 0) {
 			Integer numberOfSimulations = new Integer(args[0]);
-			new MultiSimulationParametricUncertaintyController(numberOfSimulations).run();
+			new MultiSimulationParametricUncertaintyPlusController(numberOfSimulations).run();
 		} else {
 			throw new RuntimeException("It should be informed the number of trials!");
 		}

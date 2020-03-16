@@ -27,7 +27,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 	final private Logger logger = LoggerFactory
 			.getLogger(ProportionalNonLinearQuaternionFullSDREController.class);
 
-	final private String kinematicsDefinition;
+	final protected String kinematicsDefinition;
 
 	/**
 	 * Constructor.
@@ -138,7 +138,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 	 * @param kinematicsEquation
 	 * @return
 	 */
-	private RealMatrix computeA(Rotation errorQuaternion,
+	protected RealMatrix computeA(Rotation errorQuaternion,
 			Vector3D angularVelocity, String kinematicsEquation) {
 		RealMatrix A = MatrixUtils.createRealMatrix(7, 7);
 

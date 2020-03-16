@@ -27,6 +27,8 @@ import br.inpe.cmc202.satellite.controllers.lqr.ProportionalLinearQuaternionPart
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearEulerAnglesSDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearMRPSDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearQuaternionFullSDREController;
+import br.inpe.cmc202.satellite.controllers.sdre.hinfinity.ProportionalNonLinearMRPSDREHInfinityController;
+import br.inpe.cmc202.satellite.controllers.sdre.hinfinity.ProportionalNonLinearQuaternionFullSDREHInfinityController;
 import br.inpe.cmc202.satellite.sensors.Gyroscope;
 import br.inpe.cmc202.satellite.sensors.Magnetometer;
 import br.inpe.cmc202.satellite.sensors.SetOfSunSensors;
@@ -318,6 +320,15 @@ public class Satellite {
 			this.controller = new ProportionalNonLinearMRPSDREController(this,
 					"ALPHA");
 			break;
+		case "ProportionalNonLinearQuaternionFullSDREHInfinityController":
+			this.controller = new ProportionalNonLinearQuaternionFullSDREHInfinityController(
+				this, "GIBBS");
+			break;
+		case "ProportionalNonLinearMRPSDREHInfinityController":
+			this.controller = new ProportionalNonLinearMRPSDREHInfinityController(this,
+				"FIRST");
+			break;
+			
 		default:
 			this.controller = new NopeController();
 		}

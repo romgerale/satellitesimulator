@@ -32,6 +32,7 @@ public abstract class ProportionalNonLinearBaseSDREController extends
 					" ###########0000.00000000000;-###########0000.00000000000"));
 
 	protected RealMatrix R = MatrixUtils.createRealIdentityMatrix(3);
+	protected RealMatrix R_inv = R; // inverse of identity = identity
 	protected RealMatrix Q = MatrixUtils.createRealIdentityMatrix(6);
 	protected RealMatrix Q_sqrt;
 	protected RealMatrix C = MatrixUtils.createRealIdentityMatrix(6);
