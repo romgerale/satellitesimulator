@@ -185,6 +185,15 @@ public class SimulationControllerIT {
 		assertConvergence(simCtrl);
 	}
 
+	@Test
+	public void testProportionalNonLinearMRPSDREHInfinityController()
+			throws OrekitException {
+		SimulationController simCtrl = new SimulationController(1000, .01, 1000,
+				"ProportionalNonLinearMRPSDREHInfinityController", false, 0d, 0d);
+		simCtrl.run();
+		assertConvergence(simCtrl);
+	}
+
 	/**
 	 * Check convergence for a given controller
 	 * 
