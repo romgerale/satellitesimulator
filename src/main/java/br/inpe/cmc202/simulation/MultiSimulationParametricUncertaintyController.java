@@ -25,6 +25,8 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * Main class for the comparison of the controller for a given Monte Carlo
  * perturbation model.
  * 
+ * IACLAW - 2020, since it is fixed the inertia tensors
+ * 
  * @author alessandro.g.romero
  * 
  */

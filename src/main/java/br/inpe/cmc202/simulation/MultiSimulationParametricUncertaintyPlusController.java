@@ -25,32 +25,32 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * Main class for the comparison of the controller for a given Monte Carlo
  * perturbation model.
  * 
+ * CILAMCE2020
+ * 
  * @author alessandro.g.romero
  * 
  */
 public class MultiSimulationParametricUncertaintyPlusController implements Runnable {
 
-	// IACLAW - 2020
+	// CILAMCE 2020
+	// "ProportionalNonLinearQuaternionSDREController_GIBBS",
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
-			Arrays.asList("ProportionalNonLinearQuaternionSDREController_GIBBS",
+			Arrays.asList(
 					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 
 	static final private Logger logger = LoggerFactory
 			.getLogger(MultiSimulationParametricUncertaintyPlusController.class);
 
-	// standard deviation
-	private static final double STD = 0.025d;
+	// MONTE CARLO PARAMETERS - GAUSSIAN
+	// standard deviation for INERTIA TENSOR - 3 standard deviation equals 5%
+	private static final double STD = 0.016666d;
 
-	// range for uniform distribution
-	private static final double RANGE = 0.2d;
-
-	// MONTE CARLO PARAMETERS - UNIFORM
-	// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
-	// IAALACW - 2020
+	// UNIFORM 
+	// CILAMCE - 2020
 	private static final double LOWER_ANGLE = -180d;
 	private static final double UPPER_ANGLE = 180d;
-	private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
-	private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
+	private static final double LOWER_ANGULAR_VELOCITY = -0.01d;
+	private static final double UPPER_ANGULAR_VELOCITY = 0.01d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
@@ -75,9 +75,9 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 
 		for (int i = 1; i <= numberOfSimulations; i++) {
 
-			final Properties inertiaTensor = calculateInertiaTensorUsingUniform(inertiaTensorRandom);
-			// final Properties inertiaTensor =
-			// calculateInertiaTensorUsingNormal(inertiaTensorRandom);
+			//final Properties inertiaTensor = calculateInertiaTensorUsingUniform(inertiaTensorRandom);
+			final Properties inertiaTensor =
+			 calculateInertiaTensorUsingNormal(inertiaTensorRandom);
 
 			double[] initialAttitudeEulerAngles = new double[] { gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
 					gaussianAnglesY.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
@@ -106,34 +106,6 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 				l.add(s);
 			}
 		}
-	}
-
-	/**
-	 * 
-	 * @param inertiaTensorRandom
-	 * @return
-	 */
-	private Properties calculateInertiaTensorUsingUniform(RandomDataGenerator inertiaTensorRandom) {
-		double v12 = 0.0d;
-		double v13 = 0.0d;
-		double v23 = 0.0d;
-		// computing the random inertia tensor
-		final Properties inertiaTensor = new Properties();
-		inertiaTensor.put("inertiaMoment.1.1", Double
-				.toString(inertiaTensorRandom.nextUniform(0.0547d - (0.0547d * RANGE), 0.0547d + (0.0547d * RANGE))));
-		inertiaTensor.put("inertiaMoment.1.2", Double.toString(v12));
-		inertiaTensor.put("inertiaMoment.1.3", Double.toString(v13));
-		inertiaTensor.put("inertiaMoment.2.1", Double.toString(v12));
-		inertiaTensor.put("inertiaMoment.2.2", Double
-				.toString(inertiaTensorRandom.nextUniform(0.0519d - (0.0519d * RANGE), 0.0519d + (0.0519d * RANGE))));
-		inertiaTensor.put("inertiaMoment.2.3", Double.toString(v23));
-		inertiaTensor.put("inertiaMoment.3.1", Double.toString(v13));
-		inertiaTensor.put("inertiaMoment.3.2", Double.toString(v23));
-		inertiaTensor.put("inertiaMoment.3.3", Double
-				.toString(inertiaTensorRandom.nextUniform(0.0574d - (0.0574d * RANGE), 0.0574d + (0.0574d * RANGE))));
-
-		logger.info("Monte Carlo iteration - Inertia Tensor: {} ", inertiaTensor);
-		return inertiaTensor;
 	}
 
 	/**
@@ -170,7 +142,7 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 		// Get the ThreadFactory implementation to use
 		ThreadFactory threadFactory = Executors.defaultThreadFactory();
 		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS,
+		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(3, 3, 0, TimeUnit.SECONDS,
 				new LinkedBlockingQueue<Runnable>(), threadFactory);
 
 		// starting threads
@@ -213,7 +185,10 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 			for (SimulationController s : mapSimulations.get(key)) {
 				String detail = "";
 				if (s.initialAngularVelocity != null && s.initialAttitude != null) {
-					detail = s.satelliteConfiguration.toString();
+					detail = "Initial Attitude:" + Arrays.toString(s.initialAttitude) +
+							 " Initial Angular Velocity: "+ Arrays.toString(s.initialAngularVelocity) +
+							 " Inertia Tensor Nominal: "+ s.satellite.getI_nominal().toString()+
+							 " Inertia Tensor Real: "+ s.satellite.getI().toString();
 				}
 				quaternionError.add(s.stepHandler.quaternionError);
 				angularVelocity.add(s.stepHandler.angularVelocityBody);
@@ -230,10 +205,10 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 			logger.info(details);
 			Plotter.plot2DLine(quaternionError, key, "quaternion error", details);
 			Plotter.plot2DLine(angularVelocity, key, "angular velocity", details);
-			Plotter.plot2DLine(detControllability, key + " detControllability");
+			//Plotter.plot2DLine(detControllability, key + " detControllability");
 			Plotter.plot2DLine(reactionWheelAngularVelocity, key, "reaction wheel angular velocity", details);
-			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + "reactionWheelAngularMomentum");
-			Plotter.plot2DLine(gama, key + " gama");
+			//Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + "reactionWheelAngularMomentum");
+			//Plotter.plot2DLine(gama, key + " gama");
 		}
 	}
 
@@ -245,7 +220,7 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 	 */
 	public static void main(String[] args) throws OrekitException {
 		logger.info("**********************************");
-		logger.info("Satellite Multi Simulation " + (MultiSimulationParametricUncertaintyPlusController.class
+		logger.info("Satellite Multi Simulation Parametric Uncertainty PLUS " + (MultiSimulationParametricUncertaintyPlusController.class
 				.getPackage().getImplementationVersion() == null ? ""
 						: MultiSimulationParametricUncertaintyPlusController.class.getPackage()
 								.getImplementationVersion()));
