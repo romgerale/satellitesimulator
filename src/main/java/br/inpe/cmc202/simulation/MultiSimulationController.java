@@ -157,7 +157,7 @@ public class MultiSimulationController implements Runnable {
 		// Get the ThreadFactory implementation to use
 		ThreadFactory threadFactory = Executors.defaultThreadFactory();
 		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(4, 4, 0, TimeUnit.SECONDS,
+		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(6, 6, 0, TimeUnit.SECONDS,
 				new LinkedBlockingQueue<Runnable>(), threadFactory);
 
 		// starting threads
