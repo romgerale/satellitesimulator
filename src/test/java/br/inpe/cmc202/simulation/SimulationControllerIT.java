@@ -3,6 +3,7 @@ package br.inpe.cmc202.simulation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import org.hipparchus.util.FastMath;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
@@ -226,7 +227,7 @@ public class SimulationControllerIT {
 		assertEquals(0, quaternionError[0], QUATERNION_MAX_ERROR);
 		assertEquals(0, quaternionError[1], QUATERNION_MAX_ERROR);
 		assertEquals(0, quaternionError[2], QUATERNION_MAX_ERROR);
-		assertEquals(1, quaternionError[3], QUATERNION_MAX_ERROR);
+		assertEquals(1, FastMath.abs(quaternionError[3]), QUATERNION_MAX_ERROR); // quaternion can "wind"
 	}
 
 	/**
