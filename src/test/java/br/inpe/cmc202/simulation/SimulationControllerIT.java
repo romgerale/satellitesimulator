@@ -18,6 +18,11 @@ import org.orekit.errors.OrekitException;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class SimulationControllerIT {
 
+	private static final int INTERVAL_TO_STORE = 1000;
+	private static final double STEP = .01;
+	private static final int TIME_HINF = 1000;
+	private static final int TIME = 700;
+	
 	private static final double QUATERNION_MAX_ERROR = 0.015;
 	private static final double VELOCITY_MAX_ERROR = 0.0008;
 
@@ -30,7 +35,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalDerivativeLinearSunVectorController()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalDerivativeLinearSunVectorController", false, 0d,
 				0d);
 		simCtrl.run();
@@ -40,7 +45,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalLinearEulerAnglesLQRController()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalLinearEulerAnglesLQRController", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -49,14 +54,14 @@ public class SimulationControllerIT {
 	@Test(expected = RuntimeException.class)
 	public void testProportionalLinearQuaternionFullLQRController_NOT_completely_controllable()
 			throws OrekitException {
-		new SimulationController(700, .01, 1000,
+		new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalLinearQuaternionFullLQRController", false, 0d, 0d);
 	}
 
 	@Test
 	public void testProportionalLinearQuaternionPartialLQRController()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalLinearQuaternionPartialLQRController", false, 0d,
 				0d);
 		simCtrl.run();
@@ -66,7 +71,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearEulerAnglesSDREController()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearEulerAnglesSDREController", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -75,7 +80,7 @@ public class SimulationControllerIT {
 	@Test(expected = RuntimeException.class)
 	public void testProportionalNonLinearQuaternionFullSDREController_OMEGA_NOT_completely_controllable()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_OMEGA", false,
 				0d, 0d);
 		simCtrl.run();
@@ -84,7 +89,7 @@ public class SimulationControllerIT {
 	@Test(expected = RuntimeException.class)
 	public void testProportionalNonLinearQuaternionFullSDREController_XI_NOT_completely_controllable()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_XI", false, 0d,
 				0d);
 		simCtrl.run();
@@ -93,7 +98,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearQuaternionFullSDREController_GIBBS()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_GIBBS", false,
 				0d, 0d);
 		simCtrl.run();
@@ -103,7 +108,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearQuaternionFullSDREController_GIBBS_SECOND()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_GIBBS_SECOND",
 				false, 0d, 0d);
 		simCtrl.run();
@@ -113,7 +118,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearQuaternionFullSDREController_GIBBS_ALPHA_0()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_ALPHA",
 				false, 0d, 0d);
 		simCtrl.run();
@@ -123,7 +128,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearQuaternionFullSDREController_GIBBS_ALPHA_1()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_ALPHA",
 				false, 1d, 0d);
 		simCtrl.run();
@@ -133,7 +138,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearQuaternionFullSDREController_GIBBS_ALPHA_OneHalf()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionSDREController_ALPHA",
 				false, .5d, 0d);
 		simCtrl.run();
@@ -143,7 +148,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearMRPSDREController_COMPOSED()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearMRPSDREController_FIRST", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -152,7 +157,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearMRPSDREController_PURE_OMEGA()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearMRPSDREController_SECOND", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -161,7 +166,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearMRPSDREController_ALPHA_0()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearMRPSDREController_ALPHA", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -170,7 +175,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearMRPSDREController_ALPHA_1()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearMRPSDREController_ALPHA", false, 1d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -179,7 +184,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearMRPSDREController_ALPHA_OneHalf()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(700, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearMRPSDREController_ALPHA", false, .5d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -188,7 +193,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearMRPSDREHInfinityController()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(1000, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME_HINF, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearMRPSDREHInfinityController", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
@@ -197,7 +202,7 @@ public class SimulationControllerIT {
 	@Test
 	public void testProportionalNonLinearQuaternionFullSDREHInfinityController()
 			throws OrekitException {
-		SimulationController simCtrl = new SimulationController(1000, .01, 1000,
+		SimulationController simCtrl = new SimulationController(TIME_HINF, STEP, INTERVAL_TO_STORE,
 				"ProportionalNonLinearQuaternionFullSDREHInfinityController", false, 0d, 0d);
 		simCtrl.run();
 		assertConvergence(simCtrl);
