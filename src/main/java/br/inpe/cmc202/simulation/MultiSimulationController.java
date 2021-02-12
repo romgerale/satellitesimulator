@@ -63,7 +63,8 @@ public class MultiSimulationController implements Runnable {
 
 	// IACLAW - 2020
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
-			Arrays.asList("ProportionalNonLinearQuaternionSDREController_GIBBS",
+			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
+					"ProportionalNonLinearQuaternionSDREController_GIBBS",
 					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
@@ -88,8 +89,8 @@ public class MultiSimulationController implements Runnable {
 	// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
 	// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
 	// CILAMCE - 2020 - AMAZONIA1
-	private static final double LOWER_ANGULAR_VELOCITY = -0.03d;
-	private static final double UPPER_ANGULAR_VELOCITY = 0.03d;
+	private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
+	private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
