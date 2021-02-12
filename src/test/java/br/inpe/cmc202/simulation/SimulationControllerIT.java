@@ -22,7 +22,7 @@ public class SimulationControllerIT {
 	private static final int INTERVAL_TO_STORE = 1000;
 	private static final double STEP = .01;
 	private static final int TIME_HINF = 1000;
-	private static final int TIME = 700;
+	private static final int TIME = 1000;
 	
 	private static final double QUATERNION_MAX_ERROR = 0.015;
 	private static final double VELOCITY_MAX_ERROR = 0.0008;
