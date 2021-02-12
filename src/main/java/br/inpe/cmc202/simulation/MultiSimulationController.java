@@ -69,27 +69,33 @@ public class MultiSimulationController implements Runnable {
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
 
 	// MONTE CARLO PARAMETERS
-	private static final double MEAN_ANGLE = 0d;
+	//private static final double MEAN_ANGLE = 0d;
 	// private static final double BASE_ANGULAR_VELOCITY = .010d; //
 	// SPACEOPS/ICEDYN
 	// private static final double BASE_ANGULAR_VELOCITY = .11d; // IACLAW
-	private static final double MEAN_ANGULAR_VELOCITY = 0d; // .087d; // SPIE
+	//private static final double MEAN_ANGULAR_VELOCITY = 0d; // .087d; // SPIE
 
 	// standard deviation
-	private static final double STD_ANGLE = 0.001d;
-	private static final double STD_ANGULAR_VELOCITY = 0.009d;
+	//private static final double STD_ANGLE = 0.001d;
+	//private static final double STD_ANGULAR_VELOCITY = 0.009d;
 
 	// MONTE CARLO PARAMETERS - UNIFORM
 	// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
-	// IAALACW - 2020
+	// IAALACW - 2020 - CUBESAT
 	private static final double LOWER_ANGLE = -180d;
 	private static final double UPPER_ANGLE = 180d;
-	private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
-	private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
+	// IAALACW - 2020 - CUBESAT
+	// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
+	// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
+	// CILAMCE - 2020 - AMAZONIA1
+	private static final double LOWER_ANGULAR_VELOCITY = -0.03d;
+	private static final double UPPER_ANGULAR_VELOCITY = 0.03d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
 	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
+
+	MultiSimulationController(){}
 
 	/**
 	 * @param monteCarlo
@@ -152,40 +158,35 @@ public class MultiSimulationController implements Runnable {
 	 * @see java.lang.Runnable#run()
 	 */
 	public void run() {
-		long start = System.currentTimeMillis();
+		runSimulations();
 
-		// Get the ThreadFactory implementation to use
-		ThreadFactory threadFactory = Executors.defaultThreadFactory();
-		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(6, 6, 0, TimeUnit.SECONDS,
-				new LinkedBlockingQueue<Runnable>(), threadFactory);
+		plotSimulations();
+	}
 
-		// starting threads
-		for (SimulationController s : listSimulations) {
-			executorPool.execute(s);
-		}
-
-		logger.info("Total of {} simulations are scheduled to run in {} threads", listSimulations.size(),
-				executorPool.getActiveCount());
-
-		// joinning all threads
-		executorPool.shutdown();
-		while (!executorPool.isTerminated()) {
-			try {
-				Thread.sleep(10000);
-				logger.info("{} simulations concluded from the total of {} in {} s",
-						executorPool.getCompletedTaskCount(), listSimulations.size(),
-						(System.currentTimeMillis() - start) / 1000d);
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Simulation was interrupted", e);
-			}
-		}
-
+	/**
+	 * Entry point for the simulation.
+	 * 
+	 * @param args
+	 * @throws OrekitException
+	 */
+	public static void main(String[] args) throws OrekitException {
 		logger.info("**********************************");
-		logger.info("{} simulations concluded from the total of {} in {} s", executorPool.getCompletedTaskCount(),
-				listSimulations.size(), (System.currentTimeMillis() - start) / 1000d);
+		logger.info("Satellite Multi Simulation "
+				+ (MultiSimulationController.class.getPackage().getImplementationVersion() == null ? ""
+						: MultiSimulationController.class.getPackage().getImplementationVersion()));
 		logger.info("**********************************");
 
+		if (args.length > 0) {
+			Integer numberOfSimulations = Integer.parseInt(args[0]);
+			new MultiSimulationController(numberOfSimulations).run();
+		} else {
+			throw new RuntimeException("It should be informed the number of trials!");
+		}
+
+	}
+	
+	//****
+	protected void plotSimulations() {
 		// plotting
 		NumberFormat numberFormatter = new DecimalFormat("##.00");
 		for (String key : mapSimulations.keySet()) {
@@ -236,25 +237,42 @@ public class MultiSimulationController implements Runnable {
 		}
 	}
 
-	/**
-	 * Entry point for the simulation.
-	 * 
-	 * @param args
-	 * @throws OrekitException
-	 */
-	public static void main(String[] args) throws OrekitException {
-		logger.info("**********************************");
-		logger.info("Satellite Multi Simulation "
-				+ (MultiSimulationController.class.getPackage().getImplementationVersion() == null ? ""
-						: MultiSimulationController.class.getPackage().getImplementationVersion()));
-		logger.info("**********************************");
+	protected void runSimulations() {
+		final long start = System.currentTimeMillis();
+		final int numberOfProcessors = Runtime.getRuntime()
+				.availableProcessors();
 
-		if (args.length > 0) {
-			Integer numberOfSimulations = new Integer(args[0]);
-			new MultiSimulationController(numberOfSimulations).run();
-		} else {
-			throw new RuntimeException("It should be informed the number of trials!");
+		// Get the ThreadFactory implementation to use
+		ThreadFactory threadFactory = Executors.defaultThreadFactory();
+		// creating the ThreadPoolExecutor
+		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(numberOfProcessors, numberOfProcessors, 0, TimeUnit.SECONDS,
+				new LinkedBlockingQueue<Runnable>(), threadFactory);
+
+		// starting threads
+		for (SimulationController s : listSimulations) {
+			executorPool.execute(s);
 		}
 
+		logger.info("Total of {} simulations are scheduled to run in {} threads", listSimulations.size(),
+				executorPool.getActiveCount());
+
+		// joinning all threads
+		executorPool.shutdown();
+		while (!executorPool.isTerminated()) {
+			try {
+				Thread.sleep(10000);
+				logger.info("{} simulations concluded from the total of {} in {} s",
+						executorPool.getCompletedTaskCount(), listSimulations.size(),
+						(System.currentTimeMillis() - start) / 1000d);
+			} catch (InterruptedException e) {
+				throw new RuntimeException("Simulation was interrupted", e);
+			}
+		}
+
+		logger.info("**********************************");
+		logger.info("{} simulations concluded from the total of {} in {} s", executorPool.getCompletedTaskCount(),
+				listSimulations.size(), (System.currentTimeMillis() - start) / 1000d);
+		logger.info("**********************************");
 	}
+
 }

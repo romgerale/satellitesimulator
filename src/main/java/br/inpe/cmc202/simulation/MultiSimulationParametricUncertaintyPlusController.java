@@ -2,16 +2,10 @@ package br.inpe.cmc202.simulation;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.hipparchus.random.RandomDataGenerator;
 import org.orekit.errors.OrekitException;
@@ -27,10 +21,12 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * 
  * CILAMCE2020
  * 
+ * AMAZONIA1
+ * 
  * @author alessandro.g.romero
  * 
  */
-public class MultiSimulationParametricUncertaintyPlusController implements Runnable {
+public class MultiSimulationParametricUncertaintyPlusController extends MultiSimulationController {
 
 	// CILAMCE 2020
 	// "ProportionalNonLinearQuaternionSDREController_GIBBS",
@@ -51,10 +47,6 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 	private static final double UPPER_ANGLE = 180d;
 	private static final double LOWER_ANGULAR_VELOCITY = -0.01d;
 	private static final double UPPER_ANGULAR_VELOCITY = 0.01d;
-
-	// FOR STORING
-	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
-	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
 
 	/**
 	 * @param monteCarlo
@@ -131,46 +123,7 @@ public class MultiSimulationParametricUncertaintyPlusController implements Runna
 		return inertiaTensor;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.lang.Runnable#run()
-	 */
-	public void run() {
-		long start = System.currentTimeMillis();
-
-		// Get the ThreadFactory implementation to use
-		ThreadFactory threadFactory = Executors.defaultThreadFactory();
-		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(3, 3, 0, TimeUnit.SECONDS,
-				new LinkedBlockingQueue<Runnable>(), threadFactory);
-
-		// starting threads
-		for (SimulationController s : listSimulations) {
-			executorPool.execute(s);
-		}
-
-		logger.info("Total of {} simulations are scheduled to run in {} threads", listSimulations.size(),
-				executorPool.getActiveCount());
-
-		// joinning all threads
-		executorPool.shutdown();
-		while (!executorPool.isTerminated()) {
-			try {
-				Thread.sleep(10000);
-				logger.info("{} simulations concluded from the total of {} in {} s",
-						executorPool.getCompletedTaskCount(), listSimulations.size(),
-						(System.currentTimeMillis() - start) / 1000d);
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Simulation was interrupted", e);
-			}
-		}
-
-		logger.info("**********************************");
-		logger.info("{} simulations concluded from the total of {} in {} s", executorPool.getCompletedTaskCount(),
-				listSimulations.size(), (System.currentTimeMillis() - start) / 1000d);
-		logger.info("**********************************");
-
+	protected void plotSimulations() {
 		// plotting
 		for (String key : mapSimulations.keySet()) {
 			String details = "";
