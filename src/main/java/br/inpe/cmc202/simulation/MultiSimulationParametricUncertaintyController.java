@@ -181,7 +181,7 @@ public class MultiSimulationParametricUncertaintyController extends MultiSimulat
 		logger.info("**********************************");
 
 		if (args.length > 0) {
-			Integer numberOfSimulations = new Integer(args[0]);
+			Integer numberOfSimulations = Integer.parseInt(args[0]);
 			new MultiSimulationParametricUncertaintyController(numberOfSimulations).run();
 		} else {
 			throw new RuntimeException("It should be informed the number of trials!");
