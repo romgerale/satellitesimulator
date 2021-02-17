@@ -14,7 +14,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.random.RandomDataGenerator;
+import org.hipparchus.stat.descriptive.DescriptiveStatistics;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,10 +64,18 @@ public class MultiSimulationController implements Runnable {
 	// private static final String CONTROLLER3 = "NopeController";
 
 	// IACLAW - 2020
+	//private static final List<String> CONTROLLERS = new ArrayList<String>(
+	//		Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
+	//				"ProportionalNonLinearQuaternionSDREController_GIBBS",
+	//				"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+					//"ProportionalNonLinearQuaternionSDREController_GIBBS",
+					//"ProportionalNonLinearQuaternionFullSDREHInfinityController",
+					//"ProportionalNonLinearMRPSDREController_FIRST",
+					//"ProportionalNonLinearMRPSDREHInfinityController",
+					"NopeController"));
 
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
 
@@ -160,6 +170,8 @@ public class MultiSimulationController implements Runnable {
 	 */
 	public void run() {
 		runSimulations();
+		
+		calculateStatistics();
 
 		plotSimulations();
 	}
@@ -276,4 +288,75 @@ public class MultiSimulationController implements Runnable {
 		logger.info("**********************************");
 	}
 
+	
+	protected void calculateStatistics() {
+		logger.info("**********************************");
+		logger.info("Computing statistics...");
+		
+		
+		final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
+		final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
+
+		// for each controller
+		for (String controller : mapSimulations.keySet()) {
+			double i = 0d;
+			final Map<Double, Double> valuesAng = new TreeMap<Double, Double>();
+			final Map<Double, Double> valuesQuat = new TreeMap<Double, Double>();
+			
+			boolean convergenceAng = true;
+			boolean convergenceQuat = true;
+			// for each simulation for a given controller
+			for (SimulationController s : mapSimulations.get(controller)) {
+				final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
+				final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
+				
+				// getting last 5% of time TO TEST CONVERGENCE
+				final double tToTestConvergence = s.stepHandler.lastStoredTime - (s.stepHandler.lastStoredTime * .05d);
+				logger.info("time to test convergence {}",tToTestConvergence);
+				
+				// calculate statistics of the norm of vectorial part of quaternion 
+				for (Double t : s.stepHandler.quaternionError.keySet()) {
+					final double[] quartenionError = s.stepHandler.quaternionError.get(t);
+					final double norm = new Vector3D(quartenionError[0],quartenionError[1],quartenionError[2]).getNorm();
+					logger.info("Norm of Vectorial Part of Quaternion Error {} {}",controller, norm);
+					normVectorialQuaternionError.addValue(norm);
+					if (t > tToTestConvergence && norm > 1.E-2) {
+						convergenceQuat = false;
+					}
+				}
+				
+				// calculate statistics of the norm of angular velocity
+				for (Double t : s.stepHandler.angularVelocityBody.keySet()) {
+					final double[] angularVelocity = s.stepHandler.angularVelocityBody.get(t);
+					final double norm = new Vector3D(angularVelocity[0],angularVelocity[1],angularVelocity[2]).getNorm();
+					logger.info("Norm of Angular Velocity {} {}",controller, norm);
+					normAngularVelocity.addValue(norm);
+					if (t > tToTestConvergence && norm > 1.E-3) {
+						convergenceAng = false;
+					}
+				}
+				
+				valuesQuat.put(++i, normVectorialQuaternionError.getPercentile(90d));
+				valuesAng.put(i, normAngularVelocity.getPercentile(90d));
+			}
+
+			if (convergenceAng) {
+				angularVelocityStd.put(controller, valuesAng);
+			} else {
+				angularVelocityStd.put(controller+"_UNSTABLE", valuesAng);
+			}
+			if (convergenceQuat) {
+				vectorialQuaternionErrorStd.put(controller, valuesQuat);
+			} else {
+				vectorialQuaternionErrorStd.put(controller+ "_UNSTABLE", valuesQuat);
+			}
+		}
+
+		logger.info("Statistics computed!");
+		logger.info(angularVelocityStd.entrySet().toString());
+		logger.info(vectorialQuaternionErrorStd.entrySet().toString());
+		
+		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of Norm of Vectorial part of Quaternion Error");
+		Plotter.plot2DLine(angularVelocityStd, "Statistics of Norm of Angular Velocity");
+	}
 }

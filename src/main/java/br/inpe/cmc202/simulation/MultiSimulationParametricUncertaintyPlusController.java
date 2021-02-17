@@ -31,7 +31,8 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	// CILAMCE 2020
 	// "ProportionalNonLinearQuaternionSDREController_GIBBS",
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
-			Arrays.asList(
+			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
+					"ProportionalNonLinearQuaternionSDREController_GIBBS",
 					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 
 	static final private Logger logger = LoggerFactory
