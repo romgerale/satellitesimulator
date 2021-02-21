@@ -185,4 +185,11 @@ public class SetOfReactionWheels {
 		return state;
 	}
 
+	/**
+	 * @return the maximum angular velocity in radians/s
+	 */	
+	public double getMAX_ANGULAR_VELOCITY() {
+		return MAX_ANGULAR_VELOCITY;
+	}
+
 }
