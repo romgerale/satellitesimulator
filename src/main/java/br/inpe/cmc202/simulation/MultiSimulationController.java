@@ -149,6 +149,19 @@ public class MultiSimulationController implements Runnable {
 					initialAttitudeEulerAngles[1], initialAttitudeEulerAngles[2]);
 			logger.info("Monte Carlo iteration - Angular Velocity: {} {} {}", initialAngularVelocity[0],
 					initialAngularVelocity[1], initialAngularVelocity[2]);
+			
+			// CHECKING BOUNDARIES for angular velocity
+			final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
+			final SimulationController ss = new SimulationController("NopeController", initialAttitudeEulerAngles,
+					initialAngularVelocity);
+			RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+			if (angVelocity.getEntry(0) > max.getEntry(0) ||
+				angVelocity.getEntry(1) > max.getEntry(1) ||
+				angVelocity.getEntry(2) > max.getEntry(2)) {
+				logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
+						initialAngularVelocity[1], initialAngularVelocity[2]);
+				break;
+			}
 
 			for (String controller : CONTROLLERS) {
 				

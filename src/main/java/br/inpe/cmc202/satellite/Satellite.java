@@ -634,7 +634,7 @@ public class Satellite {
 	/**
 	 * @return the maximum angular velocity controllable by the reaction wheels
 	 */
-	public RealMatrix getMaximumAngularVelocityControllableByReactionWheels() {
+	public RealVector getMaximumAngularVelocityControllableByReactionWheels() {
 		
 		// calculating maximum angular momentum of the reaction wheels
 		final SetOfReactionWheels set = this.getSetOfReactionWheels();
@@ -650,7 +650,7 @@ public class Satellite {
 		final DecompositionSolver solver = new LUDecomposition(inertia).getSolver();
 		final RealMatrix maxAngVelocity = solver.solve(maxActuatorsAngularMomentum);
 
-		return maxAngVelocity;
+		return new ArrayRealVector(maxAngVelocity.getColumn(0));
 	}
 
 	
