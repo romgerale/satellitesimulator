@@ -15,8 +15,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.RealVector;
 import org.hipparchus.random.RandomDataGenerator;
 import org.hipparchus.stat.descriptive.DescriptiveStatistics;
+import org.math.plot.utils.FastMath;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,8 +74,8 @@ public class MultiSimulationController implements Runnable {
 
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					//"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					//"ProportionalNonLinearQuaternionFullSDREHInfinityController",
+					"ProportionalNonLinearQuaternionSDREController_GIBBS",
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController",
 					//"ProportionalNonLinearMRPSDREController_FIRST",
 					//"ProportionalNonLinearMRPSDREHInfinityController",
 					"NopeController"));
@@ -99,8 +102,8 @@ public class MultiSimulationController implements Runnable {
 	// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
 	// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
 	// CILAMCE - 2020 - AMAZONIA1
-	private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
-	private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
+	private static final double LOWER_ANGULAR_VELOCITY = -0.03d;
+	private static final double UPPER_ANGULAR_VELOCITY = 0.03d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
@@ -297,47 +300,68 @@ public class MultiSimulationController implements Runnable {
 		final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
 		final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
 
+		final Map<String, Map<Double, Double>> stateSpaceStd = new TreeMap<String, Map<Double, Double>>();
+
 		// for each controller
 		for (String controller : mapSimulations.keySet()) {
 			double i = 0d;
 			final Map<Double, Double> valuesAng = new TreeMap<Double, Double>();
 			final Map<Double, Double> valuesQuat = new TreeMap<Double, Double>();
+			final Map<Double, Double> valuesStateSpace = new TreeMap<Double, Double>();
 			
 			boolean convergenceAng = true;
 			boolean convergenceQuat = true;
+			boolean convergenceStateSpace = true;
 			// for each simulation for a given controller
 			for (SimulationController s : mapSimulations.get(controller)) {
 				final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
 				final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
+				final DescriptiveStatistics normStateSpace = new DescriptiveStatistics();
 				
 				// getting last 5% of time TO TEST CONVERGENCE
 				final double tToTestConvergence = s.stepHandler.lastStoredTime - (s.stepHandler.lastStoredTime * .05d);
 				logger.info("time to test convergence {}",tToTestConvergence);
 				
-				// calculate statistics of the norm of vectorial part of quaternion 
 				for (Double t : s.stepHandler.quaternionError.keySet()) {
+					// calculate statistics of the norm of vectorial part of quaternion 
 					final double[] quartenionError = s.stepHandler.quaternionError.get(t);
-					final double norm = new Vector3D(quartenionError[0],quartenionError[1],quartenionError[2]).getNorm();
-					logger.info("Norm of Vectorial Part of Quaternion Error {} {}",controller, norm);
-					normVectorialQuaternionError.addValue(norm);
-					if (t > tToTestConvergence && norm > 1.E-2) {
+					final double normQ = new Vector3D(quartenionError[0],quartenionError[1],quartenionError[2]).getNorm();
+					logger.debug("Norm of Vectorial Part of Quaternion Error {} {}",controller, normQ);
+					normVectorialQuaternionError.addValue(normQ);
+					if (t > tToTestConvergence && normQ > 1.E-2) {
 						convergenceQuat = false;
 					}
-				}
-				
-				// calculate statistics of the norm of angular velocity
-				for (Double t : s.stepHandler.angularVelocityBody.keySet()) {
+
+					// calculate statistics of the norm of angular velocity
 					final double[] angularVelocity = s.stepHandler.angularVelocityBody.get(t);
-					final double norm = new Vector3D(angularVelocity[0],angularVelocity[1],angularVelocity[2]).getNorm();
-					logger.info("Norm of Angular Velocity {} {}",controller, norm);
-					normAngularVelocity.addValue(norm);
-					if (t > tToTestConvergence && norm > 1.E-3) {
+					final double normV = new Vector3D(angularVelocity[0],angularVelocity[1],angularVelocity[2]).getNorm();
+					logger.debug("Norm of Angular Velocity {} {}",controller, normV);
+					normAngularVelocity.addValue(normV);
+					if (t > tToTestConvergence && normV > 1.E-3) {
 						convergenceAng = false;
 					}
+					
+					// calculate statistics of the norm of state space: 
+					// quaternion (last entry as scalar and adjusted to origin) 
+					// and angular velocity
+					final RealVector stateSpace = new ArrayRealVector(new double[] { 
+							quartenionError[0],
+							quartenionError[1],
+							quartenionError[2], 
+							1-FastMath.abs(quartenionError[3]), // adjusting to origin 0
+							angularVelocity[0],
+							angularVelocity[1],
+							angularVelocity[2]});
+					logger.info("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
+					normStateSpace.addValue(stateSpace.getNorm());
+					if (t > tToTestConvergence && stateSpace.getNorm() > 1.E-2) {
+						convergenceStateSpace = false;
+					}
 				}
-				
+								
 				valuesQuat.put(++i, normVectorialQuaternionError.getPercentile(90d));
 				valuesAng.put(i, normAngularVelocity.getPercentile(90d));
+				valuesStateSpace.put(i, normStateSpace.getPercentile(90));
 			}
 
 			if (convergenceAng) {
@@ -350,13 +374,20 @@ public class MultiSimulationController implements Runnable {
 			} else {
 				vectorialQuaternionErrorStd.put(controller+ "_UNSTABLE", valuesQuat);
 			}
+			if (convergenceStateSpace) {
+				stateSpaceStd.put(controller,  valuesStateSpace);
+			} else {
+				stateSpaceStd.put(controller+"_UNSTABLE",  valuesStateSpace);
+			}			
 		}
 
 		logger.info("Statistics computed!");
 		logger.info(angularVelocityStd.entrySet().toString());
 		logger.info(vectorialQuaternionErrorStd.entrySet().toString());
+		logger.info(stateSpaceStd.entrySet().toString());
 		
 		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of Norm of Vectorial part of Quaternion Error");
 		Plotter.plot2DLine(angularVelocityStd, "Statistics of Norm of Angular Velocity");
+		Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
 	}
 }
