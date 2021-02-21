@@ -41,35 +41,13 @@ public class DomainOfAttractionIT {
 		}
 	}
 
-	private RealMatrix maxActuatorAngularMomentum(String satelliteName) {
-		final Satellite sat = new Satellite(null, "NopeController", null, loadSatelliteConfiguration(satelliteName),
+
+	@Test
+	public void testMaxSatelliteAngularVelocityAmazonia1() {
+		logger.info(" AMAZONIA1");
+		final Satellite sat = new Satellite(null, "NopeController", null, loadSatelliteConfiguration("amazonia1"),
 				null);
-		final SetOfReactionWheels set = sat.getSetOfReactionWheels();
-		final RealMatrix inertia = set.getInertiaTensorContribution();
-		final RealMatrix maxAngularVelocity = MatrixUtils
-				.createRealMatrix(new double[][] { { set.getMAX_ANGULAR_VELOCITY() }, { set.getMAX_ANGULAR_VELOCITY() },
-						{ set.getMAX_ANGULAR_VELOCITY() } });
-		logger.info(" Maximum Actuator angular velocity degrees/s: X={} Y={} Z={}",
-				FastMath.toDegrees(maxAngularVelocity.getEntry(0, 0)),
-				FastMath.toDegrees(maxAngularVelocity.getEntry(1, 0)),
-				FastMath.toDegrees(maxAngularVelocity.getEntry(2, 0)));
-		final RealMatrix maxActuatorsAngularMomentum = inertia.multiply(maxAngularVelocity);
-		logger.info(" Maximum Actuators angular momentum kg m^2 s^{−1}: {}",
-				maxActuatorsAngularMomentum.toString());
-		return maxActuatorsAngularMomentum;
-
-	}
-
-	private void maxSatelliteAngularVelocity(final String satelliteName) {
-		final Satellite sat = new Satellite(null, "NopeController", null, loadSatelliteConfiguration(satelliteName),
-				null);
-		final RealMatrix inertia = sat.getI();
-
-		logger.info(" Inertia Tensor Satellite: {}", inertia.toString());
-		// calculating max angular velocity = Iw = L
-		DecompositionSolver solver = new LUDecomposition(inertia).getSolver();
-		final RealMatrix maxAngVelocity = solver.solve(maxActuatorAngularMomentum(satelliteName));
-
+		final RealMatrix maxAngVelocity = sat.getMaximumAngularVelocityControllableByReactionWheels();
 		logger.info(" Maximum Satellite angular velocity r/s: {}", maxAngVelocity.toString());
 
 		logger.info(" NORM L2 - Maximum Satellite angular velocity r/s: {}", maxAngVelocity.getFrobeniusNorm());
@@ -79,27 +57,19 @@ public class DomainOfAttractionIT {
 				FastMath.toDegrees(maxAngVelocity.getEntry(2, 0)));
 	}
 
-	@Test
-	public void testMaxReactionWheelAngularMomentumAmazonia1() {
-		logger.info(" AMAZONIA1");
-		maxActuatorAngularMomentum("amazonia1");
-	}
-
-	@Test
-	public void testMaxSatelliteAngularVelocityAmazonia1() {
-		logger.info(" AMAZONIA1");
-		maxSatelliteAngularVelocity("amazonia1");
-	}
-
-	@Test
-	public void testMaxReactionWheelAngularMomentumConasat() {
-		logger.info(" CONASAT");
-		maxActuatorAngularMomentum("conasat");
-	}
 
 	@Test
 	public void testMaxSatelliteAngularVelocityConasat() {
 		logger.info(" CONASAT");
-		maxSatelliteAngularVelocity("conasat");
+		final Satellite sat = new Satellite(null, "NopeController", null, loadSatelliteConfiguration("conasat"),
+				null);
+		final RealMatrix maxAngVelocity = sat.getMaximumAngularVelocityControllableByReactionWheels();
+		logger.info(" Maximum Satellite angular velocity r/s: {}", maxAngVelocity.toString());
+
+		logger.info(" NORM L2 - Maximum Satellite angular velocity r/s: {}", maxAngVelocity.getFrobeniusNorm());
+
+		logger.info(" Maximum Actuator angular velocity degrees/s: X={} Y={} Z={}",
+				FastMath.toDegrees(maxAngVelocity.getEntry(0, 0)), FastMath.toDegrees(maxAngVelocity.getEntry(1, 0)),
+				FastMath.toDegrees(maxAngVelocity.getEntry(2, 0)));
 	}
 }

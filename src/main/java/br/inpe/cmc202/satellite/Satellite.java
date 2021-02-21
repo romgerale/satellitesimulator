@@ -5,6 +5,7 @@ import java.util.Properties;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.DecompositionSolver;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
@@ -628,5 +629,29 @@ public class Satellite {
 				+ sunReference_body + ",\n externalTorquesMagnitude="
 				+ externalTorquesMagnitude + ",\n alpha1=" + alpha1 + "]";
 	}
+	
+	
+	/**
+	 * @return the maximum angular velocity controllable by the reaction wheels
+	 */
+	public RealMatrix getMaximumAngularVelocityControllableByReactionWheels() {
+		
+		// calculating maximum angular momentum of the reaction wheels
+		final SetOfReactionWheels set = this.getSetOfReactionWheels();
+		final RealMatrix inertiaSet = set.getInertiaTensorContribution();
+		final RealMatrix maxAngularVelocity = MatrixUtils
+				.createRealMatrix(new double[][] { { set.getMAX_ANGULAR_VELOCITY() }, { set.getMAX_ANGULAR_VELOCITY() },
+						{ set.getMAX_ANGULAR_VELOCITY() } });
+		final RealMatrix maxActuatorsAngularMomentum = inertiaSet.multiply(maxAngularVelocity);
 
+		
+		// calculating max angular velocity = Iw = L
+		final RealMatrix inertia = this.getI();
+		final DecompositionSolver solver = new LUDecomposition(inertia).getSolver();
+		final RealMatrix maxAngVelocity = solver.solve(maxActuatorsAngularMomentum);
+
+		return maxAngVelocity;
+	}
+
+	
 }
