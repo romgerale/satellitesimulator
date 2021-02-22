@@ -44,6 +44,7 @@
 			</exclusions>
 		</dependency>
 		<!-- BEGIN using the last version of Hipparchus -->
+		<!--  for snapshots https://packages.orekit.org/#browse/browse:maven-snapshots -->
 		<dependency>
 			<artifactId>hipparchus-core</artifactId>
 			<groupId>org.hipparchus</groupId>
