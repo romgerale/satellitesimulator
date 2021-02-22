@@ -7,6 +7,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
+import org.hipparchus.geometry.euclidean.threed.Rotation;
+import org.hipparchus.geometry.euclidean.threed.RotationConvention;
+import org.hipparchus.geometry.euclidean.threed.RotationOrder;
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.RealVector;
 import org.hipparchus.random.RandomDataGenerator;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
@@ -33,8 +39,11 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
 					"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
-
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController",
+					//"ProportionalNonLinearMRPSDREController_FIRST",
+					//"ProportionalNonLinearMRPSDREHInfinityController",
+					"NopeController"));
+	
 	static final private Logger logger = LoggerFactory
 			.getLogger(MultiSimulationParametricUncertaintyPlusController.class);
 
@@ -46,8 +55,11 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	// CILAMCE - 2020
 	private static final double LOWER_ANGLE = -180d;
 	private static final double UPPER_ANGLE = 180d;
-	private static final double LOWER_ANGULAR_VELOCITY = -0.01d;
-	private static final double UPPER_ANGULAR_VELOCITY = 0.01d;
+	//private static final double LOWER_ANGULAR_VELOCITY = -0.01d;
+	//private static final double UPPER_ANGULAR_VELOCITY = 0.01d;
+	
+	private static final double LOWER_ANGULAR_VELOCITY = -1E-4d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+	private static final double UPPER_ANGULAR_VELOCITY = 1E-4d;
 
 	/**
 	 * @param monteCarlo
@@ -55,6 +67,9 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	 */
 	public MultiSimulationParametricUncertaintyPlusController(int numberOfSimulations) throws OrekitException {
 		logger.info("Configuring multi simulation... NumberOfTrials: {}", numberOfSimulations);
+
+		initialAngles.put("initialAngles", new TreeMap<Double, double[]>());
+		initialAngularVelocities.put("initialAngularVelocities", new TreeMap<Double, double[]>());
 
 		RandomDataGenerator inertiaTensorRandom = new RandomDataGenerator();
 
@@ -86,17 +101,41 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 			logger.info("Monte Carlo iteration - Angular Velocity: {} {} {}", initialAngularVelocity[0],
 					initialAngularVelocity[1], initialAngularVelocity[2]);
 
-			// CONTROLLERS
-			for (String controller : CONTROLLERS) {
-				SimulationController s = new SimulationController(controller, inertiaTensor, initialAttitudeEulerAngles,
-						initialAngularVelocity);
-				listSimulations.add(s);
-				List<SimulationController> l = mapSimulations.get(controller);
-				if (l == null) {
-					l = new ArrayList<SimulationController>();
-					mapSimulations.put(controller, l);
+			// CHECKING BOUNDARIES for angular velocity
+			final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
+			final SimulationController ss = new SimulationController("NopeController", initialAttitudeEulerAngles,
+					initialAngularVelocity);
+			RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+			if (angVelocity.getEntry(0) > max.getEntry(0) ||
+				angVelocity.getEntry(1) > max.getEntry(1) ||
+				angVelocity.getEntry(2) > max.getEntry(2)) {
+				logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
+						initialAngularVelocity[1], initialAngularVelocity[2]);
+			} else {
+				// CONTROLLERS
+				for (String controller : CONTROLLERS) {
+					SimulationController s = new SimulationController(controller, inertiaTensor, initialAttitudeEulerAngles,
+							initialAngularVelocity);
+					listSimulations.add(s);
+					List<SimulationController> l = mapSimulations.get(controller);
+					if (l == null) {
+						l = new ArrayList<SimulationController>();
+						mapSimulations.put(controller, l);
+					}
+					l.add(s);
 				}
-				l.add(s);
+				// INITIAL CONDITIONS
+				// showing initial Euler angles as rotations of the unit vector
+				final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
+						initialAttitudeEulerAngles[1], 
+						initialAttitudeEulerAngles[2]);
+				Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
+				initialAngles.get("initialAngles").put((double)i, init3d.toArray());
+				// angular velocities
+				initialAngularVelocities.get("initialAngularVelocities").put((double)i, new double[] {
+						initialAngularVelocity[0], 
+						initialAngularVelocity[1], 
+						initialAngularVelocity[2]});
 			}
 		}
 	}

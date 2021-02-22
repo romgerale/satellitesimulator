@@ -14,6 +14,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.hipparchus.geometry.euclidean.threed.Rotation;
+import org.hipparchus.geometry.euclidean.threed.RotationConvention;
+import org.hipparchus.geometry.euclidean.threed.RotationOrder;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.ArrayRealVector;
 import org.hipparchus.linear.RealVector;
@@ -102,13 +105,21 @@ public class MultiSimulationController implements Runnable {
 	// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
 	// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
 	// CILAMCE - 2020 - AMAZONIA1
-	private static final double LOWER_ANGULAR_VELOCITY = -0.03d;
-	private static final double UPPER_ANGULAR_VELOCITY = 0.03d;
+	//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
+	//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
+
+	private static final double LOWER_ANGULAR_VELOCITY = -1E-4d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+	private static final double UPPER_ANGULAR_VELOCITY = 1E-4d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
 	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
 
+	// FOR STORING INITIAL CONDITIONS
+	final Map<String, Map<Double, double[]>> initialAngles = new TreeMap<String, Map<Double, double[]>>();
+	final Map<String, Map<Double, double[]>> initialAngularVelocities = new TreeMap<String, Map<Double, double[]>>();
+
+	
 	MultiSimulationController(){}
 
 	/**
@@ -118,6 +129,9 @@ public class MultiSimulationController implements Runnable {
 	public MultiSimulationController(int numberOfSimulations) throws OrekitException {
 		logger.info("Configuring multi simulation... NumberOfTrials: {}", numberOfSimulations);
 		
+		initialAngles.put("initialAngles", new TreeMap<Double, double[]>());
+		initialAngularVelocities.put("initialAngularVelocities", new TreeMap<Double, double[]>());
+
 		RandomDataGenerator gaussianAnglesX = new RandomDataGenerator();
 		RandomDataGenerator gaussianAnglesY = new RandomDataGenerator();
 		RandomDataGenerator gaussianAnglesZ = new RandomDataGenerator();
@@ -160,20 +174,33 @@ public class MultiSimulationController implements Runnable {
 				angVelocity.getEntry(2) > max.getEntry(2)) {
 				logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
 						initialAngularVelocity[1], initialAngularVelocity[2]);
-				break;
-			}
+			} else {
 
-			for (String controller : CONTROLLERS) {
-				
-				SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
-						initialAngularVelocity);
-				listSimulations.add(s);
-				List<SimulationController> l = mapSimulations.get(controller);
-				if (l == null) {
-					l = new ArrayList<SimulationController>();
-					mapSimulations.put(controller, l);
+				for (String controller : CONTROLLERS) {
+					
+					SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
+							initialAngularVelocity);
+					listSimulations.add(s);
+					List<SimulationController> l = mapSimulations.get(controller);
+					if (l == null) {
+						l = new ArrayList<SimulationController>();
+						mapSimulations.put(controller, l);
+					}
+					l.add(s);
 				}
-				l.add(s);
+				
+				// INITIAL CONDITIONS
+				// showing initial Euler angles as rotations of the unit vector
+				final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
+						initialAttitudeEulerAngles[1], 
+						initialAttitudeEulerAngles[2]);
+				Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
+				initialAngles.get("initialAngles").put((double)i, init3d.toArray());
+				// angular velocities
+				initialAngularVelocities.get("initialAngularVelocities").put((double)i, new double[] {
+						initialAngularVelocity[0], 
+						initialAngularVelocity[1], 
+						initialAngularVelocity[2]});
 			}
 
 		}
@@ -264,6 +291,8 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot2DLine(gama, key + " gama");
 
 		}
+		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") for the unit vector");
+		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
 	}
 
 	protected void runSimulations() {
