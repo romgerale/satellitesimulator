@@ -95,7 +95,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 			logger.debug(
 					"Too much close to the origin (Vector Norm ||X|| {}). Assuming control ZERO.",
 					X.getNorm());
-			return new Vector3D(0, 0, 0);
+		//	return new Vector3D(0, 0, 0);
 		}
 
 		// important define the formulation for kinematics
