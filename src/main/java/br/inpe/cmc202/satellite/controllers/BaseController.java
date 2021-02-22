@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
  */
 public class BaseController implements Controller {
 
+	private static final double EPSILON = 1.0E-1;
+
 	private final Logger logger = LoggerFactory.getLogger(BaseController.class);
 
 	private double detControllability;
@@ -39,7 +41,7 @@ public class BaseController implements Controller {
 		final RealMatrix closedLoop = A.subtract(B.multiply(K));
 		EigenDecomposition eigDecomp = new EigenDecomposition(closedLoop);
 		for (double eigenValues : eigDecomp.getRealEigenvalues()) {
-			if (eigenValues > 0) {
+			if (eigenValues > EPSILON) {
 				logger.warn(
 						"STABILITY CHECK - UNSTABLE STEP - Real part of an eigen value of the step is non negative. {} ",
 						eigenValues);
