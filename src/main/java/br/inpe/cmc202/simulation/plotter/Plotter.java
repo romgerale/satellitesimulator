@@ -364,6 +364,9 @@ public class Plotter {
 		for (Map<Double, double[]> map : mmap) {
 			double[] keys = ArrayUtils.toPrimitive(map.keySet().toArray(
 					new Double[0]));
+			if (keys.length == 0) {
+				break;
+			}
 			for (int kk = 0; kk < map.get(keys[0]).length; kk++) {
 				double[][] values = new double[keys.length][2];
 				for (int i = 0; i < keys.length; i++) {
