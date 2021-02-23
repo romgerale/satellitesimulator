@@ -10,10 +10,5 @@
 		<Root level="INFO">
 			<AppenderRef ref="Console" />
 		</Root>
-		<Logger
-			name="br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearQuaternionFullSDREController"
-			level="error" additivity="false">
-			<AppenderRef ref="Console" />
-		</Logger>
 	</Loggers>
 </Configuration>
