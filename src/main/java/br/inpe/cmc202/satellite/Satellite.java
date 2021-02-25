@@ -632,7 +632,7 @@ public class Satellite {
 	
 	
 	/**
-	 * @return the maximum angular velocity controllable by the reaction wheels
+	 * @return the maximum angular velocity controllable by the reaction wheels (individually)
 	 */
 	public RealVector getMaximumAngularVelocityControllableByReactionWheels() {
 		
@@ -653,5 +653,13 @@ public class Satellite {
 		return new ArrayRealVector(maxAngVelocity.getColumn(0));
 	}
 
+	/**
+	 * Set mode used for attitude to compute the sun error
+	 * false = step by step difference of vectors 
+	 * true = quaternion error
+	 */
+	public void setModeUsingAttitude(boolean mode) {
+		this.modeUsingAttitude = mode;
+	}
 	
 }
