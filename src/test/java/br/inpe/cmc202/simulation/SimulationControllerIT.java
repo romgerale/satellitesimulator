@@ -19,8 +19,8 @@ import org.orekit.errors.OrekitException;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class SimulationControllerIT {
 
-	private static final int INTERVAL_TO_STORE = 1000;
-	private static final double STEP = .01;
+	private static final int INTERVAL_TO_STORE = 10000;
+	private static final double STEP = .001;
 	private static final int TIME_HINF = 1000;
 	private static final int TIME = 1000;
 	
@@ -34,20 +34,43 @@ public class SimulationControllerIT {
 	}
 
 	@Test
-	public void testProportionalDerivativeLinearSunVectorController()
+	public void testProportionalDerivativeLinearSunVectorControllerModeTrue()
 			throws OrekitException {
 		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalDerivativeLinearSunVectorController", false, 0d,
 				0d);
+		simCtrl.satellite.setModeUsingAttitude(true);
 		simCtrl.run();
 		assertConvergence(simCtrl);
 	}
 
 	@Test
-	public void testProportionalLinearEulerAnglesLQRController()
+	public void testProportionalDerivativeLinearSunVectorControllerModeFalse()
+			throws OrekitException {
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
+				"ProportionalDerivativeLinearSunVectorController", false, 0d,
+				0d);
+		simCtrl.satellite.setModeUsingAttitude(false);
+		simCtrl.run();
+		assertConvergence(simCtrl);
+	}
+
+	@Test
+	public void testProportionalLinearEulerAnglesLQRControllerModeTrue()
 			throws OrekitException {
 		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
 				"ProportionalLinearEulerAnglesLQRController", false, 0d, 0d);
+		simCtrl.satellite.setModeUsingAttitude(true);
+		simCtrl.run();
+		assertConvergence(simCtrl);
+	}
+
+	@Test
+	public void testProportionalLinearEulerAnglesLQRControllerModeFalse()
+			throws OrekitException {
+		SimulationController simCtrl = new SimulationController(TIME, STEP, INTERVAL_TO_STORE,
+				"ProportionalLinearEulerAnglesLQRController", false, 0d, 0d);
+		simCtrl.satellite.setModeUsingAttitude(false);
 		simCtrl.run();
 		assertConvergence(simCtrl);
 	}
