@@ -106,10 +106,10 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 			logger.trace("-- A {}", f.format(A));
 		}
 
-		checkPointwiseControlability(A, B);
-		checkPointwiseObservability(A, Q_sqrt);
-
 		try {
+			checkPointwiseControlability(A, B);
+			checkPointwiseObservability(A, Q_sqrt);
+
 			// solving Riccati
 			RiccatiEquationSolver riccatiSolver = new RiccatiEquationSolverImpl(
 					A, B, Q, R);
@@ -121,6 +121,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 			// u = -Kx
 			return new Vector3D(K.operate(X).mapMultiply(-1).toArray());
 		} catch (RuntimeException re) {
+			this.countNumericalErrors++;
 			// if a numerical error occurs in the SDRE the default control is 0
 			logger.warn(
 					"Unexpected numerical error was occurred in the SDRE solving. Assuming control ZERO.",

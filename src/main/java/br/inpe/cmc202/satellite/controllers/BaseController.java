@@ -24,6 +24,10 @@ public class BaseController implements Controller {
 
 	private double detControllability;
 	private double conditionNumberControllability;
+	
+	protected double conditionNumberA;
+	protected long countNumericalErrors;
+	
 
 	public BaseController() {
 		super();
@@ -61,6 +65,10 @@ public class BaseController implements Controller {
 	 */
 	protected void checkPointwiseControlability(final RealMatrix A,
 			final RealMatrix B) {
+		// computing the condition number of A
+		SingularValueDecomposition svdA = new SingularValueDecomposition(A);
+		this.conditionNumberA = svdA.getConditionNumber();
+		
 		final int numberOfStates = A.getRowDimension();
 		final int numberOfColumns = numberOfStates * B.getColumnDimension();
 		final int numberOfRows = B.getRowDimension();
@@ -148,12 +156,25 @@ public class BaseController implements Controller {
 	}
 
 	/**
-	 * @return the detControllability
+	 * @return the ConditionNumberControllability
 	 */
 	public double getConditionNumberControllability() {
 		return conditionNumberControllability;
 	}
 
+	/**
+	 * @return the ConditionNumberA
+	 */
+	public double getConditionNumberA() {
+		return conditionNumberA;
+	}
+	
+	/**
+	 * @return the detControllability
+	 */
+	public long getCountNumericalErrors() {
+		return countNumericalErrors;
+	}
 	/*
 	 * (non-Javadoc)
 	 * 

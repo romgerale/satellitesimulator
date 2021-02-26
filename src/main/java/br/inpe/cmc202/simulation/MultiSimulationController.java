@@ -79,8 +79,8 @@ public class MultiSimulationController implements Runnable {
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
 					"ProportionalNonLinearQuaternionSDREController_GIBBS",
 					"ProportionalNonLinearQuaternionFullSDREHInfinityController",
-					//"ProportionalNonLinearMRPSDREController_FIRST",
-					//"ProportionalNonLinearMRPSDREHInfinityController",
+					"ProportionalNonLinearMRPSDREController_FIRST",
+					"ProportionalNonLinearMRPSDREHInfinityController",
 					"NopeController"));
 
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
@@ -108,8 +108,8 @@ public class MultiSimulationController implements Runnable {
 	//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
 	//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
 
-	private static final double LOWER_ANGULAR_VELOCITY = -1E-4d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-	private static final double UPPER_ANGULAR_VELOCITY = 1E-4d;
+	private static final double LOWER_ANGULAR_VELOCITY = -1E-9d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+	private static final double UPPER_ANGULAR_VELOCITY = 1E-9d;
 
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
@@ -255,6 +255,8 @@ public class MultiSimulationController implements Runnable {
 			Map<String, Map<Double, double[]>> vetQuaternionError = new TreeMap<String, Map<Double, double[]>>();
 			Map<String, Map<Double, double[]>> vetAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
 			Map<String, Map<Double, Double>> gama = new TreeMap<String, Map<Double, Double>>();
+			Map<String, Map<Double, Double>> conditionNumberA = new TreeMap<String, Map<Double, Double>>();
+			Map<String, Map<Double, Double>> countNumericalErrors = new TreeMap<String, Map<Double, Double>>();
 			for (SimulationController s : mapSimulations.get(key)) {
 				String detail = "";
 				if (s.initialAngularVelocity != null && s.initialAttitude != null) {
@@ -273,6 +275,8 @@ public class MultiSimulationController implements Runnable {
 				vetQuaternionError.put(detail, s.stepHandler.stateSpaceQuaternions);
 				vetAngularVelocity.put(detail, s.stepHandler.angularVelocityBody);
 				gama.put(detail, s.stepHandler.gama);
+				conditionNumberA.put(detail, s.stepHandler.conditionNumberA);
+				countNumericalErrors.put(detail, s.stepHandler.countNumericalErrors);
 				details += "\n" + detail;
 			}
 			details += "";
@@ -288,7 +292,11 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot3DScatterStateSpace(vetQuaternionError, "state space quaternion - BODY");
 			Plotter.plot3DScatterStateSpace(vetAngularVelocity, "state space velocity - BODY");
 
+			// H-INFINITY
 			Plotter.plot2DLine(gama, key + " gama");
+			// Track numerical Errors
+			Plotter.plot2DLine(conditionNumberA, key + " conditionNumberA");
+			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors");
 
 		}
 		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") for the unit vector");

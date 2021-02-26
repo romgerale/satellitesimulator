@@ -80,10 +80,10 @@ public class ProportionalNonLinearQuaternionFullSDREHInfinityController
 			logger.trace("-- A {}", f.format(A));
 		}
 
-		checkPointwiseControlability(A, B);
-		checkPointwiseObservability(A, Q_sqrt);
-
 		try {
+			checkPointwiseControlability(A, B);
+			checkPointwiseObservability(A, Q_sqrt);
+
 			// HINFINTY WITH LEFT COPRIME FACTORIZATION
 			final RealMatrix R_ = MatrixUtils.createRealIdentityMatrix(7).add(D.multiply(D.transpose()));
 			final RealMatrix R_inv = MatrixUtils.inverse(R_);
@@ -151,6 +151,7 @@ public class ProportionalNonLinearQuaternionFullSDREHInfinityController
 			// u = -Kx
 			return new Vector3D(K.operate(X).mapMultiply(-1.0).toArray());
 		} catch (RuntimeException re) {
+			this.countNumericalErrors++;
 			// if a numerical error occurs in the SDRE the default control is 0
 			logger.warn("Unexpected numerical error was occurred in the SDRE solving. Assuming control ZERO.", re);
 			return new Vector3D(0, 0, 0);
