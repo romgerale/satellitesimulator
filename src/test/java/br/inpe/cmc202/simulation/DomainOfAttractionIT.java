@@ -33,7 +33,7 @@ public class DomainOfAttractionIT {
 			in.close();
 			return p;
 		} catch (IOException io) {
-			throw new RuntimeException("Problems loading amazonia1.properties");
+			throw new RuntimeException("Problems loading "+ satelliteName + ".properties");
 		}
 	}
 
