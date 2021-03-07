@@ -84,33 +84,7 @@ public class MultiSimulationController implements Runnable {
 					"NopeController"));
 
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
-
-	// MONTE CARLO PARAMETERS
-	//private static final double MEAN_ANGLE = 0d;
-	// private static final double BASE_ANGULAR_VELOCITY = .010d; //
-	// SPACEOPS/ICEDYN
-	// private static final double BASE_ANGULAR_VELOCITY = .11d; // IACLAW
-	//private static final double MEAN_ANGULAR_VELOCITY = 0d; // .087d; // SPIE
-
-	// standard deviation
-	//private static final double STD_ANGLE = 0.001d;
-	//private static final double STD_ANGULAR_VELOCITY = 0.009d;
-
-	// MONTE CARLO PARAMETERS - UNIFORM
-	// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
-	// IAALACW - 2020 - CUBESAT
-	private static final double LOWER_ANGLE = -180d;
-	private static final double UPPER_ANGLE = 180d;
-	// IAALACW - 2020 - CUBESAT
-	// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
-	// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
-	// CILAMCE - 2020 - AMAZONIA1
-	//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
-	//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
-
-	private static final double LOWER_ANGULAR_VELOCITY = -1E-9d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-	private static final double UPPER_ANGULAR_VELOCITY = 1E-9d;
-
+	
 	// FOR STORING
 	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
 	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
@@ -118,89 +92,44 @@ public class MultiSimulationController implements Runnable {
 	// FOR STORING INITIAL CONDITIONS
 	final Map<String, Map<Double, double[]>> initialAngles = new TreeMap<String, Map<Double, double[]>>();
 	final Map<String, Map<Double, double[]>> initialAngularVelocities = new TreeMap<String, Map<Double, double[]>>();
+	final Map<String, Map<Double, double[]>> initialAnglesForVisualization = new TreeMap<String, Map<Double, double[]>>();
 
 	
 	MultiSimulationController(){}
 
 	/**
-	 * @param monteCarlo
+	 * Constructor for the set of simulations.
+	 * 
+	 * @param numberOfSimulations
+	 * @param approach for the definition of initial conditions (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)
 	 * @throws OrekitException
 	 */
-	public MultiSimulationController(int numberOfSimulations) throws OrekitException {
+	public MultiSimulationController(int numberOfSimulations, int approach) throws OrekitException {
 		logger.info("Configuring multi simulation... NumberOfTrials: {}", numberOfSimulations);
 		
-		initialAngles.put("initialAngles", new TreeMap<Double, double[]>());
-		initialAngularVelocities.put("initialAngularVelocities", new TreeMap<Double, double[]>());
+		computeInitialConditions(numberOfSimulations, approach);
+		
+		// getting the computed initial conditions
+		final Map<Double, double[]> initialAnglesComputed = initialAngles.get("initialAngles");
+		final Map<Double, double[]> initialAngularVelocitiesComputed = initialAngularVelocities.get("initialAngularVelocities");
 
-		RandomDataGenerator gaussianAnglesX = new RandomDataGenerator();
-		RandomDataGenerator gaussianAnglesY = new RandomDataGenerator();
-		RandomDataGenerator gaussianAnglesZ = new RandomDataGenerator();
+		for (int i = 1; i <= initialAnglesComputed.size(); i++) {
 
-		RandomDataGenerator gaussianVelocityX = new RandomDataGenerator();
-		RandomDataGenerator gaussianVelocityY = new RandomDataGenerator();
-		RandomDataGenerator gaussianVelocityZ = new RandomDataGenerator();
-		for (int i = 1; i <= numberOfSimulations; i++) {
+			final double[] initialAttitudeEulerAngles = initialAnglesComputed.get((double)i);
 
-			//double[] initialAttitudeEulerAngles = new double[] { gaussianAnglesX.nextNormal(MEAN_ANGLE, STD_ANGLE),
-			//		gaussianAnglesY.nextNormal(MEAN_ANGLE, STD_ANGLE),
-			//		gaussianAnglesZ.nextNormal(MEAN_ANGLE, STD_ANGLE) };
+			final double[] initialAngularVelocity = initialAngularVelocitiesComputed.get((double)i);
 
-			//double[] initialAngularVelocity = new double[] {
-			//		gaussianVelocityX.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY),
-			//		gaussianVelocityY.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY),
-			//		gaussianVelocityZ.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY) };
-
-			double[] initialAttitudeEulerAngles = new double[] { gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
-					gaussianAnglesY.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
-					gaussianAnglesZ.nextUniform(LOWER_ANGLE, UPPER_ANGLE) };
-
-			double[] initialAngularVelocity = new double[] {
-					gaussianVelocityX.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY),
-					gaussianVelocityY.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY),
-					gaussianVelocityZ.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY) };
-
-			logger.info("Monte Carlo iteration - Euler Angles: {} {} {}", initialAttitudeEulerAngles[0],
-					initialAttitudeEulerAngles[1], initialAttitudeEulerAngles[2]);
-			logger.info("Monte Carlo iteration - Angular Velocity: {} {} {}", initialAngularVelocity[0],
-					initialAngularVelocity[1], initialAngularVelocity[2]);
-			
-			// CHECKING BOUNDARIES for angular velocity
-			final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
-			final SimulationController ss = new SimulationController("NopeController", initialAttitudeEulerAngles,
-					initialAngularVelocity);
-			RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
-			if (angVelocity.getEntry(0) > max.getEntry(0) ||
-				angVelocity.getEntry(1) > max.getEntry(1) ||
-				angVelocity.getEntry(2) > max.getEntry(2)) {
-				logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
-						initialAngularVelocity[1], initialAngularVelocity[2]);
-			} else {
-
-				for (String controller : CONTROLLERS) {
-					
-					SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
-							initialAngularVelocity);
-					listSimulations.add(s);
-					List<SimulationController> l = mapSimulations.get(controller);
-					if (l == null) {
-						l = new ArrayList<SimulationController>();
-						mapSimulations.put(controller, l);
-					}
-					l.add(s);
-				}
+			for (String controller : CONTROLLERS) {
 				
-				// INITIAL CONDITIONS
-				// showing initial Euler angles as rotations of the unit vector
-				final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
-						initialAttitudeEulerAngles[1], 
-						initialAttitudeEulerAngles[2]);
-				Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
-				initialAngles.get("initialAngles").put((double)i, init3d.toArray());
-				// angular velocities
-				initialAngularVelocities.get("initialAngularVelocities").put((double)i, new double[] {
-						initialAngularVelocity[0], 
-						initialAngularVelocity[1], 
-						initialAngularVelocity[2]});
+				SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
+						initialAngularVelocity);
+				listSimulations.add(s);
+				List<SimulationController> l = mapSimulations.get(controller);
+				if (l == null) {
+					l = new ArrayList<SimulationController>();
+					mapSimulations.put(controller, l);
+				}
+				l.add(s);
 			}
 
 		}
@@ -232,16 +161,25 @@ public class MultiSimulationController implements Runnable {
 						: MultiSimulationController.class.getPackage().getImplementationVersion()));
 		logger.info("**********************************");
 
+		int numberOfSimulations = 0;
+		int approach = 1;
 		if (args.length > 0) {
-			Integer numberOfSimulations = Integer.parseInt(args[0]);
-			new MultiSimulationController(numberOfSimulations).run();
+			numberOfSimulations = Integer.parseInt(args[0]);
+			if (args.length > 1) {
+				approach = Integer.parseInt(args[1]);
+			}
 		} else {
 			throw new RuntimeException("It should be informed the number of trials!");
 		}
 
+		new MultiSimulationController(numberOfSimulations, approach).run();
 	}
 	
 	//****
+	/**
+	 * For plotting simulations.
+	 * 
+	 */
 	protected void plotSimulations() {
 		// plotting
 		NumberFormat numberFormatter = new DecimalFormat("##.00");
@@ -299,10 +237,14 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors");
 
 		}
-		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") for the unit vector");
+		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
 		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
 	}
 
+	/**
+	 * For running simulations.
+	 * 
+	 */
 	protected void runSimulations() {
 		final long start = System.currentTimeMillis();
 		final int numberOfProcessors = Runtime.getRuntime()
@@ -342,6 +284,10 @@ public class MultiSimulationController implements Runnable {
 	}
 
 	
+	/**
+	 * For calculating statistics.
+	 * 
+	 */
 	protected void calculateStatistics() {
 		logger.info("**********************************");
 		logger.info("Computing statistics...");
@@ -375,19 +321,26 @@ public class MultiSimulationController implements Runnable {
 				for (Double t : s.stepHandler.quaternionError.keySet()) {
 					// calculate statistics of the norm of vectorial part of quaternion 
 					final double[] quartenionError = s.stepHandler.quaternionError.get(t);
-					final double normQ = new Vector3D(quartenionError[0],quartenionError[1],quartenionError[2]).getNorm();
-					logger.debug("Norm of Vectorial Part of Quaternion Error {} {}",controller, normQ);
-					normVectorialQuaternionError.addValue(normQ);
-					if (t > tToTestConvergence && normQ > 1.E-2) {
+					final RealVector quaternion = new ArrayRealVector(new double[] { 
+							quartenionError[0],
+							quartenionError[1],
+							quartenionError[2], 
+							1-FastMath.abs(quartenionError[3])}); // adjusting to origin 0
+					logger.debug("Norm of Vectorial Part of Quaternion Error {} {}",controller, quaternion.getNorm());
+					normVectorialQuaternionError.addValue(quaternion.getNorm());
+					if (t > tToTestConvergence && quaternion.getNorm() > 1.E-2) {
 						convergenceQuat = false;
 					}
 
 					// calculate statistics of the norm of angular velocity
-					final double[] angularVelocity = s.stepHandler.angularVelocityBody.get(t);
-					final double normV = new Vector3D(angularVelocity[0],angularVelocity[1],angularVelocity[2]).getNorm();
-					logger.debug("Norm of Angular Velocity {} {}",controller, normV);
-					normAngularVelocity.addValue(normV);
-					if (t > tToTestConvergence && normV > 1.E-3) {
+					final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
+					final RealVector angularVelocity = new ArrayRealVector(new double[] { 
+							angularVelocityError[0],
+							angularVelocityError[1],
+							angularVelocityError[2]});
+					logger.debug("Norm of Angular Velocity {} {}",controller, angularVelocity.getNorm());
+					normAngularVelocity.addValue(angularVelocity.getNorm());
+					if (t > tToTestConvergence && angularVelocity.getNorm() > 1.E-3) {
 						convergenceAng = false;
 					}
 					
@@ -399,9 +352,9 @@ public class MultiSimulationController implements Runnable {
 							quartenionError[1],
 							quartenionError[2], 
 							1-FastMath.abs(quartenionError[3]), // adjusting to origin 0
-							angularVelocity[0],
-							angularVelocity[1],
-							angularVelocity[2]});
+							angularVelocityError[0],
+							angularVelocityError[1],
+							angularVelocityError[2]});
 					logger.info("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
 					normStateSpace.addValue(stateSpace.getNorm());
 					if (t > tToTestConvergence && stateSpace.getNorm() > 1.E-2) {
@@ -440,4 +393,214 @@ public class MultiSimulationController implements Runnable {
 		Plotter.plot2DLine(angularVelocityStd, "Statistics of Norm of Angular Velocity");
 		Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
 	}
+	
+	//****
+	/**
+	 * For computing initial conditions for simulations.
+	 * 
+	 * @param numberOfSimulations
+	 * @param approach for the definition of initial conditions (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)
+	 */
+	protected void computeInitialConditions(int numberOfSimulations, int approach) throws OrekitException {
+		
+		logger.info("**********************************");
+		logger.info("Computing initial conditions for {} number of simulations and approach {} (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)...", numberOfSimulations, approach);
+
+		initialAngles.put("initialAngles", new TreeMap<Double, double[]>());
+		initialAngularVelocities.put("initialAngularVelocities", new TreeMap<Double, double[]>());
+		initialAnglesForVisualization.put("initialAnglesForVisualization", new TreeMap<Double, double[]>());
+
+		// for checking external boundaries of attractor
+		final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
+		
+		//*********************************
+		// INITIAL CONDITIONS 
+		// MONTE CARLO PARAMETERS
+		final double MEAN_ANGLE = 0d;
+		// SPACEOPS/ICEDYN
+		// private static final double BASE_ANGULAR_VELOCITY = .11d; // IACLAW // 0.01d SPACEOPS
+		final double MEAN_ANGULAR_VELOCITY = 0d; // .087d; // SPIE
+
+		// standard deviation
+		final double STD_ANGLE = 0.001d;
+		final double STD_ANGULAR_VELOCITY = 0.009d;
+
+		// MONTE CARLO PARAMETERS - UNIFORM
+		// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
+		// IAALACW - 2020 - CUBESAT
+		//private static final double LOWER_ANGLE = -180d;
+		//private static final double UPPER_ANGLE = 180d;
+		final double LOWER_ANGLE = -180d; //-1E-9d;
+		final double UPPER_ANGLE = 180d; //1E-9d;
+		// IAALACW - 2020 - CUBESAT
+		// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
+		// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
+		// CILAMCE - 2020 - AMAZONIA1
+		//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
+		//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
+
+		final double LOWER_ANGULAR_VELOCITY = -1E-2d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+		final double UPPER_ANGULAR_VELOCITY = 1E-2d; //1E-1 // too big
+
+		// INITIAL CONDITIONS 
+		//*********************************
+
+		
+		// NORMAL or UNIFORM
+		if (approach <= 1) {
+			
+			final RandomDataGenerator gaussianAnglesX = new RandomDataGenerator();
+			final RandomDataGenerator gaussianAnglesY = new RandomDataGenerator();
+			final RandomDataGenerator gaussianAnglesZ = new RandomDataGenerator();
+
+			final RandomDataGenerator gaussianVelocityX = new RandomDataGenerator();
+			final RandomDataGenerator gaussianVelocityY = new RandomDataGenerator();
+			final RandomDataGenerator gaussianVelocityZ = new RandomDataGenerator();
+			
+			for (int i = 1; i <= numberOfSimulations; i++) {
+	
+				final double[] initialAttitudeEulerAngles = new double[] {0,0,0};
+				final double[] initialAngularVelocity = new double[] {0,0,0};
+				
+				if (approach == 0 ) {
+					// NORMAL
+					initialAttitudeEulerAngles[0] = gaussianAnglesX.nextNormal(MEAN_ANGLE, STD_ANGLE);
+					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextNormal(MEAN_ANGLE, STD_ANGLE);
+					initialAttitudeEulerAngles[2] = gaussianAnglesZ.nextNormal(MEAN_ANGLE, STD_ANGLE);
+							
+					initialAngularVelocity[0] = gaussianVelocityX.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY);
+					initialAngularVelocity[1] = gaussianVelocityY.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY);
+					initialAngularVelocity[2] = gaussianVelocityZ.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY);
+					
+				} else {
+					// UNIFORM
+					initialAttitudeEulerAngles[0] = gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
+					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
+					initialAttitudeEulerAngles[2] = gaussianAnglesZ.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
+							
+					initialAngularVelocity[0] = gaussianVelocityX.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY);
+					initialAngularVelocity[1] = gaussianVelocityY.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY);
+					initialAngularVelocity[2] = gaussianVelocityZ.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY);
+
+				}
+	
+				// CHECKING BOUNDARIES for angular velocity
+				final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
+				RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+				if (angVelocity.getEntry(0) > max.getEntry(0) ||
+					angVelocity.getEntry(1) > max.getEntry(1) ||
+					angVelocity.getEntry(2) > max.getEntry(2)) {
+					logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
+							initialAngularVelocity[1], initialAngularVelocity[2]);
+				} else {
+					logger.info("Monte Carlo iteration - {} - Euler Angles (X,Y,Z): {} {} {} \t- Angular Velocity (X,Y,Z): {} {} {}", String.format("%4d", i), 
+							String.format("%+3.3f", initialAttitudeEulerAngles[0]),
+							String.format("%+3.3f", initialAttitudeEulerAngles[1]), 
+							String.format("%+3.3f", initialAttitudeEulerAngles[2]), 
+							String.format("%+.3f", initialAngularVelocity[0]),
+							String.format("%+.3f", initialAngularVelocity[1]),
+							String.format("%+.3f", initialAngularVelocity[2])
+							);
+					
+					// INITIAL CONDITIONS
+					initialAngles.get("initialAngles").put((double)i, initialAttitudeEulerAngles);
+					// angular velocities
+					initialAngularVelocities.get("initialAngularVelocities").put((double)i, initialAngularVelocity);
+					// showing initial Euler angles as rotations of the unit vector
+					final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
+							initialAttitudeEulerAngles[1], 
+							initialAttitudeEulerAngles[2]);
+					Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
+					initialAnglesForVisualization.get("initialAnglesForVisualization").put((double)i, init3d.toArray());
+				}
+	
+			}
+		} else {
+			// EXPLORE STATE SPACE
+			final long t = FastMath.round(FastMath.pow(numberOfSimulations, 1d/6d)); // 6 fors - 3 angles and 3 angular velocities
+			if (t <= 1l) {
+				throw new RuntimeException("Number of Simulations must be bigger than 64 for state space exploration (at least the boundaries)!");
+			}
+			int i = 0;
+			for (int k = 0; k < t; k++) { // ANGLE X
+								
+				final double[] initialAttitudeEulerAngles = new double[] {0,0,0};
+				final double[] initialAngularVelocity = new double[] {0,0,0};
+
+				// computing
+				final double range = FastMath.abs(LOWER_ANGLE) + FastMath.abs(UPPER_ANGLE);
+				final double eulerAngleX = LOWER_ANGLE + k*range/(t-1);
+				initialAttitudeEulerAngles[0] = eulerAngleX;
+
+				for (int l = 0; l < t; l++) {  // ANGLE Y
+					// computing
+					final double eulerAngleY = LOWER_ANGLE + l*range/(t-1);
+					initialAttitudeEulerAngles[1] = eulerAngleY;
+
+					for (int m = 0; m < t; m++) {  // ANGLE Z
+						// computing
+						final double eulerAngleZ = LOWER_ANGLE + m*range/(t-1);
+						initialAttitudeEulerAngles[2] = eulerAngleZ;
+
+						for (int n = 0; n < t; n++) { // VELOCITY X
+							
+							// computing
+							final double rangeVelocity = FastMath.abs(LOWER_ANGULAR_VELOCITY) + FastMath.abs(UPPER_ANGULAR_VELOCITY);
+							final double angularVelocityX = LOWER_ANGULAR_VELOCITY + n*rangeVelocity/(t-1);
+							initialAngularVelocity[0] = angularVelocityX;
+
+							for (int o = 0; o < t; o++) { // VELOCITY Y
+
+								// computing
+								final double angularVelocityY = LOWER_ANGULAR_VELOCITY + o*rangeVelocity/(t-1);
+								initialAngularVelocity[1] = angularVelocityY;
+								
+								for (int p = 0; p < t; p++) { // VELOCITY Z
+
+									// computing
+									final double angularVelocityZ = LOWER_ANGULAR_VELOCITY + p*rangeVelocity/(t-1);
+									initialAngularVelocity[2] = angularVelocityZ;
+
+									i++;
+									
+									// CHECKING BOUNDARIES for angular velocity
+									final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
+									RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+									if (angVelocity.getEntry(0) > max.getEntry(0) ||
+										angVelocity.getEntry(1) > max.getEntry(1) ||
+										angVelocity.getEntry(2) > max.getEntry(2)) {
+										logger.warn("State Space Exploration iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
+												initialAngularVelocity[1], initialAngularVelocity[2]);
+									} else {
+
+										logger.info("State Space Exploration iteration - {} - Euler Angles (X,Y,Z): {} {} {} \t- Angular Velocity (X,Y,Z): {} {} {}", String.format("%4d", i), 
+												String.format("%+3.3f", initialAttitudeEulerAngles[0]),
+												String.format("%+3.3f", initialAttitudeEulerAngles[1]), 
+												String.format("%+3.3f", initialAttitudeEulerAngles[2]), 
+												String.format("%+.3f", initialAngularVelocity[0]),
+												String.format("%+.3f", initialAngularVelocity[1]),
+												String.format("%+.3f", initialAngularVelocity[2])
+												);
+	
+										// INITIAL CONDITIONS
+										initialAngles.get("initialAngles").put((double)i, initialAttitudeEulerAngles);
+										// angular velocities
+										initialAngularVelocities.get("initialAngularVelocities").put((double)i, initialAngularVelocity);
+										// showing initial Euler angles as rotations of the unit vector
+										final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
+												initialAttitudeEulerAngles[1], 
+												initialAttitudeEulerAngles[2]);
+										Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
+										initialAnglesForVisualization.get("initialAnglesForVisualization").put((double)i, init3d.toArray());
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		logger.info("Initial conditions computed!");
+	}
+
 }
