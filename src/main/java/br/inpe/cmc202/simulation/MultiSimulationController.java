@@ -95,6 +95,9 @@ public class MultiSimulationController implements Runnable {
 	final Map<String, Map<Double, double[]>> initialAnglesForVisualization = new TreeMap<String, Map<Double, double[]>>();
 
 	
+	/**
+	 * Default constructor.
+	 */
 	MultiSimulationController(){}
 
 	/**
@@ -104,11 +107,11 @@ public class MultiSimulationController implements Runnable {
 	 * @param approach for the definition of initial conditions (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)
 	 * @throws OrekitException
 	 */
-	public MultiSimulationController(int numberOfSimulations, int approach) throws OrekitException {
-		logger.info("Configuring multi simulation... NumberOfTrials: {}", numberOfSimulations);
-		
+	public MultiSimulationController(int numberOfSimulations, int approach) throws OrekitException {		
 		computeInitialConditions(numberOfSimulations, approach);
 		
+		logger.info("----------------------------");
+		logger.info("Configuring multi simulation... number of simulations: {}", numberOfSimulations);
 		// getting the computed initial conditions
 		final Map<Double, double[]> initialAnglesComputed = initialAngles.get("initialAngles");
 		final Map<Double, double[]> initialAngularVelocitiesComputed = initialAngularVelocities.get("initialAngularVelocities");
@@ -133,6 +136,8 @@ public class MultiSimulationController implements Runnable {
 			}
 
 		}
+		logger.info("{} simulations configured!", listSimulations.size());
+		logger.info("----------------------------");
 	}
 
 	/*
@@ -143,7 +148,7 @@ public class MultiSimulationController implements Runnable {
 	public void run() {
 		runSimulations();
 		
-		calculateStatistics();
+		computeResults();
 
 		plotSimulations();
 	}
@@ -181,6 +186,9 @@ public class MultiSimulationController implements Runnable {
 	 * 
 	 */
 	protected void plotSimulations() {
+		logger.info("----------------------------");
+		logger.info("Plotting results...");
+		
 		// plotting
 		NumberFormat numberFormatter = new DecimalFormat("##.00");
 		for (String key : mapSimulations.keySet()) {
@@ -223,22 +231,24 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot2DLine(quaternionError, key, "quaternion error", details);
 			Plotter.plot2DLine(angularVelocity, key, "angular velocity", details);
 			Plotter.plot2DLine(detControllability, key + " detControllability");
-			Plotter.plot2DLine(reactionWheelAngularVelocity, key, "reaction wheel angular velocity", details);
-			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + "reactionWheelAngularMomentum");
+			Plotter.plot2DLine(reactionWheelAngularVelocity, key, " reaction wheel angular velocity", details);
+			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + " reactionWheelAngularMomentum");
 
 			// STATE SPACE
-			Plotter.plot3DScatterStateSpace(vetQuaternionError, "state space quaternion - BODY");
-			Plotter.plot3DScatterStateSpace(vetAngularVelocity, "state space velocity - BODY");
+			Plotter.plot3DScatterStateSpace(vetQuaternionError, key + " state space quaternion - BODY");
+			Plotter.plot3DScatterStateSpace(vetAngularVelocity, key + " state space velocity - BODY");
 
 			// H-INFINITY
 			Plotter.plot2DLine(gama, key + " gama");
 			// Track numerical Errors
-			Plotter.plot2DLine(conditionNumberA, key + " conditionNumberA");
-			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors");
+			Plotter.plot2DLine(conditionNumberA, key + " conditionNumberA", false);
+			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors", false);
 
 		}
 		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
 		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
+		logger.info("Results plotted!");
+		logger.info("----------------------------");
 	}
 
 	/**
@@ -246,6 +256,10 @@ public class MultiSimulationController implements Runnable {
 	 * 
 	 */
 	protected void runSimulations() {
+		
+		logger.info("----------------------------");
+		logger.info("Starting simulations {}...", listSimulations.size());
+
 		final long start = System.currentTimeMillis();
 		final int numberOfProcessors = Runtime.getRuntime()
 				.availableProcessors();
@@ -277,10 +291,10 @@ public class MultiSimulationController implements Runnable {
 			}
 		}
 
-		logger.info("**********************************");
+		logger.info("----------------------------");
 		logger.info("{} simulations concluded from the total of {} in {} s", executorPool.getCompletedTaskCount(),
 				listSimulations.size(), (System.currentTimeMillis() - start) / 1000d);
-		logger.info("**********************************");
+		logger.info("----------------------------");
 	}
 
 	
@@ -288,14 +302,12 @@ public class MultiSimulationController implements Runnable {
 	 * For calculating statistics.
 	 * 
 	 */
-	protected void calculateStatistics() {
-		logger.info("**********************************");
-		logger.info("Computing statistics...");
-		
-		
+	protected void computeResults() {
+		logger.info("----------------------------");
+		logger.info("Computing results...");
+				
 		final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
 		final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
-
 		final Map<String, Map<Double, Double>> stateSpaceStd = new TreeMap<String, Map<Double, Double>>();
 
 		// for each controller
@@ -384,7 +396,6 @@ public class MultiSimulationController implements Runnable {
 			}			
 		}
 
-		logger.info("Statistics computed!");
 		logger.info(angularVelocityStd.entrySet().toString());
 		logger.info(vectorialQuaternionErrorStd.entrySet().toString());
 		logger.info(stateSpaceStd.entrySet().toString());
@@ -392,6 +403,8 @@ public class MultiSimulationController implements Runnable {
 		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of Norm of Vectorial part of Quaternion Error");
 		Plotter.plot2DLine(angularVelocityStd, "Statistics of Norm of Angular Velocity");
 		Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
+		logger.info("Results computed!");
+		logger.info("----------------------------");
 	}
 	
 	//****
@@ -403,7 +416,7 @@ public class MultiSimulationController implements Runnable {
 	 */
 	protected void computeInitialConditions(int numberOfSimulations, int approach) throws OrekitException {
 		
-		logger.info("**********************************");
+		logger.info("----------------------------");
 		logger.info("Computing initial conditions for {} number of simulations and approach {} (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)...", numberOfSimulations, approach);
 
 		initialAngles.put("initialAngles", new TreeMap<Double, double[]>());
@@ -601,6 +614,8 @@ public class MultiSimulationController implements Runnable {
 			}
 		}
 		logger.info("Initial conditions computed!");
+		logger.info("----------------------------");
+				
 	}
 
 }
