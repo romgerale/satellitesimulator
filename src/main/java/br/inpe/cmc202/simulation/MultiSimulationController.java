@@ -80,8 +80,8 @@ public class MultiSimulationController implements Runnable {
 					"ProportionalNonLinearQuaternionSDREController_GIBBS",
 					"ProportionalNonLinearQuaternionFullSDREHInfinityController",
 					"ProportionalNonLinearMRPSDREController_FIRST",
-					"ProportionalNonLinearMRPSDREHInfinityController",
-					"NopeController"));
+					"ProportionalNonLinearMRPSDREHInfinityController"));
+					//"NopeController"));
 
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
 	
@@ -174,7 +174,7 @@ public class MultiSimulationController implements Runnable {
 				approach = Integer.parseInt(args[1]);
 			}
 		} else {
-			throw new RuntimeException("It should be informed the number of trials!");
+			throw new RuntimeException("It must be informed the number of trials!");
 		}
 
 		new MultiSimulationController(numberOfSimulations, approach).run();
@@ -310,21 +310,34 @@ public class MultiSimulationController implements Runnable {
 		final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
 		final Map<String, Map<Double, Double>> stateSpaceStd = new TreeMap<String, Map<Double, Double>>();
 
+		final Map<String, Map<Double, double[]>> domainOfAttractionNorm = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
+
 		// for each controller
 		for (String controller : mapSimulations.keySet()) {
 			double i = 0d;
 			final Map<Double, Double> valuesAng = new TreeMap<Double, Double>();
 			final Map<Double, Double> valuesQuat = new TreeMap<Double, Double>();
 			final Map<Double, Double> valuesStateSpace = new TreeMap<Double, Double>();
-			
-			boolean convergenceAng = true;
-			boolean convergenceQuat = true;
-			boolean convergenceStateSpace = true;
+
+			domainOfAttractionNorm.put(controller, new TreeMap<Double, double[]>());
+			domainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
+			domainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
+
+			boolean convergenceAngC = true;
+			boolean convergenceQuatC = true;
+			boolean convergenceStateSpaceC = true;
+
 			// for each simulation for a given controller
 			for (SimulationController s : mapSimulations.get(controller)) {
 				final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
 				final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
 				final DescriptiveStatistics normStateSpace = new DescriptiveStatistics();
+
+				boolean convergenceAng = true;
+				boolean convergenceQuat = true;
+				boolean convergenceStateSpace = true;
 				
 				// getting last 5% of time TO TEST CONVERGENCE
 				final double tToTestConvergence = s.stepHandler.lastStoredTime - (s.stepHandler.lastStoredTime * .05d);
@@ -352,7 +365,7 @@ public class MultiSimulationController implements Runnable {
 							angularVelocityError[2]});
 					logger.debug("Norm of Angular Velocity {} {}",controller, angularVelocity.getNorm());
 					normAngularVelocity.addValue(angularVelocity.getNorm());
-					if (t > tToTestConvergence && angularVelocity.getNorm() > 1.E-3) {
+					if (t > tToTestConvergence && angularVelocity.getNorm() > 1.E-2) {
 						convergenceAng = false;
 					}
 					
@@ -373,23 +386,59 @@ public class MultiSimulationController implements Runnable {
 						convergenceStateSpace = false;
 					}
 				}
-								
+												
 				valuesQuat.put(++i, normVectorialQuaternionError.getPercentile(90d));
 				valuesAng.put(i, normAngularVelocity.getPercentile(90d));
 				valuesStateSpace.put(i, normStateSpace.getPercentile(90));
+
+				// convergence present in the quaternionError and in the angular velocity error
+				// so initial conditions are inside the domain of attraction
+				if (convergenceQuat && convergenceAng) {
+					// evaluate the initial conditions
+					final Rotation initialR = s.initialAttitudeS.getRotation();
+					final RealVector initialConditionAngularVelocity = new ArrayRealVector(s.initialAttitudeS.getSpin().toArray());
+					final double[] initialConditionEulerAngles = new double[] {
+							FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[0]),
+							FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[1]),
+							FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[2])};
+					final RealVector initialConditionAttitude = new ArrayRealVector(new double[] { 
+							initialR.getQ1(),
+							initialR.getQ2(),
+							initialR.getQ3(), 
+							1-FastMath.abs(initialR.getQ0())}); // adjusting to origin 0
+					
+					logger.info("Inside domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+							controller, 
+							initialConditionAttitude,
+							initialConditionAttitude.getNorm(),
+							initialConditionEulerAngles, 
+							initialConditionAngularVelocity,
+							initialConditionAngularVelocity.getNorm());
+					
+					domainOfAttractionNorm.get(controller).put(i, new double[] {
+							initialConditionAttitude.getNorm(),
+							initialConditionAngularVelocity.getNorm()});
+					domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
+					domainOfAttractionAngularVelocity.get(controller).put(i, 
+							initialConditionAngularVelocity.toArray());
+				}
+				
+				convergenceAngC = convergenceAngC && convergenceAng;
+				convergenceQuatC = convergenceQuatC && convergenceQuat;
+				convergenceStateSpaceC = convergenceStateSpaceC && convergenceStateSpace;
 			}
 
-			if (convergenceAng) {
+			if (convergenceAngC) {
 				angularVelocityStd.put(controller, valuesAng);
 			} else {
 				angularVelocityStd.put(controller+"_UNSTABLE", valuesAng);
 			}
-			if (convergenceQuat) {
+			if (convergenceQuatC) {
 				vectorialQuaternionErrorStd.put(controller, valuesQuat);
 			} else {
 				vectorialQuaternionErrorStd.put(controller+ "_UNSTABLE", valuesQuat);
 			}
-			if (convergenceStateSpace) {
+			if (convergenceStateSpaceC) {
 				stateSpaceStd.put(controller,  valuesStateSpace);
 			} else {
 				stateSpaceStd.put(controller+"_UNSTABLE",  valuesStateSpace);
@@ -399,10 +448,19 @@ public class MultiSimulationController implements Runnable {
 		logger.info(angularVelocityStd.entrySet().toString());
 		logger.info(vectorialQuaternionErrorStd.entrySet().toString());
 		logger.info(stateSpaceStd.entrySet().toString());
+		for (String controller : mapSimulations.keySet()) {
+			logger.info("DOMAIN OF ATTRACTION - NORM - Controller {} - Samples {} Converged {}", 
+					controller, 
+					mapSimulations.get(controller).size(), 
+					domainOfAttractionNorm.get(controller).size());
+		}
 		
-		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of Norm of Vectorial part of Quaternion Error");
-		Plotter.plot2DLine(angularVelocityStd, "Statistics of Norm of Angular Velocity");
+		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of L2 Norm of Quaternion Error");
+		Plotter.plot2DLine(angularVelocityStd, "Statistics of L2 Norm of Angular Velocity");
 		Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
+		Plotter.plot2DScatterInitialConditions(domainOfAttractionNorm, "Domain of Attraction - Norm");
+		Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude");
+		Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity");
 		logger.info("Results computed!");
 		logger.info("----------------------------");
 	}
@@ -425,7 +483,8 @@ public class MultiSimulationController implements Runnable {
 
 		// for checking external boundaries of attractor
 		final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
-		
+		final RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+
 		//*********************************
 		// INITIAL CONDITIONS 
 		// MONTE CARLO PARAMETERS
@@ -452,8 +511,8 @@ public class MultiSimulationController implements Runnable {
 		//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
 		//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
 
-		final double LOWER_ANGULAR_VELOCITY = -1E-2d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-		final double UPPER_ANGULAR_VELOCITY = 1E-2d; //1E-1 // too big
+		final double LOWER_ANGULAR_VELOCITY = -15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+		final double UPPER_ANGULAR_VELOCITY = 15E-3d; //1E-1 // too big
 
 		// INITIAL CONDITIONS 
 		//*********************************
@@ -499,7 +558,6 @@ public class MultiSimulationController implements Runnable {
 	
 				// CHECKING BOUNDARIES for angular velocity
 				final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
-				RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
 				if (angVelocity.getEntry(0) > max.getEntry(0) ||
 					angVelocity.getEntry(1) > max.getEntry(1) ||
 					angVelocity.getEntry(2) > max.getEntry(2)) {
@@ -530,9 +588,15 @@ public class MultiSimulationController implements Runnable {
 			}
 		} else {
 			// EXPLORE STATE SPACE
+			// 2^6 = 64
+			// 3^6 = 729
+			// 4^6 = 4096
+			// 5^6 = 15625
+			// 6^6 = 46656
+			// 7ˆ6 = 117649
 			final long t = FastMath.round(FastMath.pow(numberOfSimulations, 1d/6d)); // 6 fors - 3 angles and 3 angular velocities
 			if (t <= 1l) {
-				throw new RuntimeException("Number of Simulations must be bigger than 64 for state space exploration (at least the boundaries)!");
+				throw new RuntimeException("In the state space exploration, the number of simulations is just a hint for the determination of such final number (power(numberOfSimulation,1/6)), which must be greater than 2 but it is " + t + "!");
 			}
 			int i = 0;
 			for (int k = 0; k < t; k++) { // ANGLE X
@@ -578,7 +642,6 @@ public class MultiSimulationController implements Runnable {
 									
 									// CHECKING BOUNDARIES for angular velocity
 									final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
-									RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
 									if (angVelocity.getEntry(0) > max.getEntry(0) ||
 										angVelocity.getEntry(1) > max.getEntry(1) ||
 										angVelocity.getEntry(2) > max.getEntry(2)) {
@@ -613,7 +676,7 @@ public class MultiSimulationController implements Runnable {
 				}
 			}
 		}
-		logger.info("Initial conditions computed!");
+		logger.info("{} initial conditions computed!", initialAngles.get("initialAngles").size());
 		logger.info("----------------------------");
 				
 	}

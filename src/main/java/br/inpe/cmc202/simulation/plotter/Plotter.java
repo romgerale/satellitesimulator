@@ -530,15 +530,17 @@ public class Plotter {
 			}
 
 			// ploting
-			plot.addScatterPlot(initialState, valuesX, valuesY, valuesZ);
-			if(!initialState.contains("Poincare")) {
-				plot.addScatterPlot(initialState + " Initial State",
-						new double[] { valuesX[0] }, new double[] { valuesY[0] },
-						new double[] { valuesZ[0] });
-				plot.addScatterPlot(initialState + " Final State",
-						new double[] { valuesX[i - 1] },
-						new double[] { valuesY[i - 1] },
-						new double[] { valuesZ[i - 1] });
+			if (valuesX.length > 0 && valuesY.length > 0 && valuesX.length > 0 ) {
+				plot.addScatterPlot(initialState, valuesX, valuesY, valuesZ);
+				if(!initialState.contains("Poincare") && !name.contains("Domain of Attraction")) {
+					plot.addScatterPlot(initialState + " Initial State",
+							new double[] { valuesX[0] }, new double[] { valuesY[0] },
+							new double[] { valuesZ[0] });
+					plot.addScatterPlot(initialState + " Final State",
+							new double[] { valuesX[i - 1] },
+							new double[] { valuesY[i - 1] },
+							new double[] { valuesZ[i - 1] });
+				}
 			}
 		}
 
@@ -555,14 +557,14 @@ public class Plotter {
 		});
 
 	}
-
+		
 	/**
 	 * General use 2d scatter.
 	 * 
 	 * @param toPlot
 	 * @param name
 	 */
-	public static void plot2DScatterStateSpace(
+	public static void plot2DScatterInitialConditions(
 			Map<String, Map<Double, double[]>> mmap, String name) {
 		if (mmap == null || mmap.isEmpty()) {
 			return;
@@ -572,25 +574,23 @@ public class Plotter {
 		Plot2DPanel plot = new Plot2DPanel();
 		plot.addLegend("SOUTH");
 		plot.addScatterPlot("Origin", new double[] { 0 }, new double[] { 0 });
+		plot.setAxisLabels("norm of quaternion", "norm of angular velocity");
+
 		for (String initialState : mmap.keySet()) {
 			// formatting data
-			Collection<double[]> values = mmap.get(initialState).values();
-			double[] valuesX = new double[values.size()];
-			double[] valuesY = new double[values.size()];
+			Collection<double[]> valuesS = mmap.get(initialState).values();
+			double[][] values = new double[valuesS.size()][2];
 			int i = 0;
-			for (double[] value : values) {
-				valuesX[i] = value[0];
-				valuesY[i] = value[1];
+			for (double[] value : valuesS) {
+				values[i][0] = value[0];
+				values[i][1] = value[1];
 				i++;
 			}
 
 			// ploting
-			plot.addScatterPlot(initialState, valuesX, valuesY);
-			plot.addScatterPlot(initialState + " Initial State",
-					new double[] { valuesX[0] }, new double[] { valuesY[0] });
-			plot.addScatterPlot(initialState + " Final State",
-					new double[] { valuesX[i - 1] },
-					new double[] { valuesY[i - 1] });
+			if (values.length > 0) {
+				plot.addScatterPlot(initialState, values);
+			}
 		}
 
 		JFrame frame = new JFrame(name);
