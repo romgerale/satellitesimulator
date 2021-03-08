@@ -245,8 +245,6 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors", false);
 
 		}
-		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
-		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
 		logger.info("Results plotted!");
 		logger.info("----------------------------");
 	}
@@ -502,8 +500,8 @@ public class MultiSimulationController implements Runnable {
 		// IAALACW - 2020 - CUBESAT
 		//private static final double LOWER_ANGLE = -180d;
 		//private static final double UPPER_ANGLE = 180d;
-		final double LOWER_ANGLE = -180d; //-1E-9d;
-		final double UPPER_ANGLE = 180d; //1E-9d;
+		final double LOWER_ANGLE = -1E-9d; // -180d; 
+		final double UPPER_ANGLE = 1E-9d; //180d; 
 		// IAALACW - 2020 - CUBESAT
 		// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
 		// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
@@ -659,11 +657,13 @@ public class MultiSimulationController implements Runnable {
 												);
 	
 										// INITIAL CONDITIONS
-										initialAngles.get("initialAngles").put((double)i, initialAttitudeEulerAngles);
+										initialAngles.get("initialAngles").put((double)i, initialAttitudeEulerAngles.clone());
 										// angular velocities
-										initialAngularVelocities.get("initialAngularVelocities").put((double)i, initialAngularVelocity);
+										initialAngularVelocities.get("initialAngularVelocities").put((double)i, initialAngularVelocity.clone());
 										// showing initial Euler angles as rotations of the unit vector
-										final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
+										final Rotation rot = new Rotation(RotationOrder.XYZ, 
+												RotationConvention.FRAME_TRANSFORM, 
+												initialAttitudeEulerAngles[0], 
 												initialAttitudeEulerAngles[1], 
 												initialAttitudeEulerAngles[2]);
 										Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
@@ -676,6 +676,11 @@ public class MultiSimulationController implements Runnable {
 				}
 			}
 		}
+		
+		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") Euler Angles");
+		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
+		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
+
 		logger.info("{} initial conditions computed!", initialAngles.get("initialAngles").size());
 		logger.info("----------------------------");
 				
