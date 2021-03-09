@@ -492,8 +492,8 @@ public class MultiSimulationController implements Runnable {
 		final double MEAN_ANGULAR_VELOCITY = 0d; // .087d; // SPIE
 
 		// standard deviation
-		final double STD_ANGLE = 0.001d;
-		final double STD_ANGULAR_VELOCITY = 0.009d;
+		final double STD_ANGLE = 180d/3d;
+		final double STD_ANGULAR_VELOCITY = FastMath.max(FastMath.max(max.getEntry(0), max.getEntry(1)), max.getEntry(2))/3d;
 
 		// MONTE CARLO PARAMETERS - UNIFORM
 		// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
