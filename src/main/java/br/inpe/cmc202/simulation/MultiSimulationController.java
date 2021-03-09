@@ -500,8 +500,8 @@ public class MultiSimulationController implements Runnable {
 		// IAALACW - 2020 - CUBESAT
 		//private static final double LOWER_ANGLE = -180d;
 		//private static final double UPPER_ANGLE = 180d;
-		final double LOWER_ANGLE = -1E-9d; // -180d; 
-		final double UPPER_ANGLE = 1E-9d; //180d; 
+		final double LOWER_ANGLE = -180d; //-1E-9d; // -180d; 
+		final double UPPER_ANGLE = 180d; //1E-9d; //180d; 
 		// IAALACW - 2020 - CUBESAT
 		// private static final double LOWER_ANGULAR_VELOCITY = -0.15d;
 		// private static final double UPPER_ANGULAR_VELOCITY = 0.15d;
@@ -509,8 +509,8 @@ public class MultiSimulationController implements Runnable {
 		//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
 		//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
 
-		final double LOWER_ANGULAR_VELOCITY = -15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-		final double UPPER_ANGULAR_VELOCITY = 15E-3d; //1E-1 // too big
+		final double LOWER_ANGULAR_VELOCITY = -1 * FastMath.max(FastMath.max(max.getEntry(0), max.getEntry(1)), max.getEntry(2));//-15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+		final double UPPER_ANGULAR_VELOCITY = FastMath.max(FastMath.max(max.getEntry(0), max.getEntry(1)), max.getEntry(2));//15E-3d; //1E-1d // too big
 
 		// INITIAL CONDITIONS 
 		//*********************************
@@ -555,13 +555,20 @@ public class MultiSimulationController implements Runnable {
 				}
 	
 				// CHECKING BOUNDARIES for angular velocity
+				// EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION - AMAZONIA-1: 0.03854253829546482 0.03325811543822333 0.022574544749001883
 				final RealVector angVelocity = new ArrayRealVector(initialAngularVelocity);
 				if (angVelocity.getEntry(0) > max.getEntry(0) ||
 					angVelocity.getEntry(1) > max.getEntry(1) ||
 					angVelocity.getEntry(2) > max.getEntry(2)) {
-					logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
-							initialAngularVelocity[1], initialAngularVelocity[2]);
-				} else {
+					logger.warn("Monte Carlo iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION: {} {} {}", 
+							initialAngularVelocity[0],
+							initialAngularVelocity[1], 
+							initialAngularVelocity[2],
+							max.getEntry(0),
+							max.getEntry(1),
+							max.getEntry(2));
+				}  
+				{
 					logger.info("Monte Carlo iteration - {} - Euler Angles (X,Y,Z): {} {} {} \t- Angular Velocity (X,Y,Z): {} {} {}", String.format("%4d", i), 
 							String.format("%+3.3f", initialAttitudeEulerAngles[0]),
 							String.format("%+3.3f", initialAttitudeEulerAngles[1]), 
@@ -643,10 +650,15 @@ public class MultiSimulationController implements Runnable {
 									if (angVelocity.getEntry(0) > max.getEntry(0) ||
 										angVelocity.getEntry(1) > max.getEntry(1) ||
 										angVelocity.getEntry(2) > max.getEntry(2)) {
-										logger.warn("State Space Exploration iteration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION", initialAngularVelocity[0],
-												initialAngularVelocity[1], initialAngularVelocity[2]);
-									} else {
-
+										logger.warn("State Space Exploration - Angular Velocity: {} {} {} OUT OF THE EXTERNAL BOUNDARIES OF THE DOMAIN OF ATTRACTION: {} {} {}", 
+												initialAngularVelocity[0],
+												initialAngularVelocity[1], 
+												initialAngularVelocity[2],
+												max.getEntry(0),
+												max.getEntry(1),
+												max.getEntry(2));
+									} 
+									{
 										logger.info("State Space Exploration iteration - {} - Euler Angles (X,Y,Z): {} {} {} \t- Angular Velocity (X,Y,Z): {} {} {}", String.format("%4d", i), 
 												String.format("%+3.3f", initialAttitudeEulerAngles[0]),
 												String.format("%+3.3f", initialAttitudeEulerAngles[1]), 
