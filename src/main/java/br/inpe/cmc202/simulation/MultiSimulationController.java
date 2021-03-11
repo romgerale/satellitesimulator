@@ -312,6 +312,10 @@ public class MultiSimulationController implements Runnable {
 		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
 		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
 
+		final Map<String, Map<Double, double[]>> complementDomainOfAttractionNorm = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> complementDomainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> complementDomainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
+
 		// for each controller
 		for (String controller : mapSimulations.keySet()) {
 			double i = 0d;
@@ -322,6 +326,10 @@ public class MultiSimulationController implements Runnable {
 			domainOfAttractionNorm.put(controller, new TreeMap<Double, double[]>());
 			domainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
 			domainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
+
+			complementDomainOfAttractionNorm.put(controller, new TreeMap<Double, double[]>());
+			complementDomainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
+			complementDomainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
 
 			boolean convergenceAngC = true;
 			boolean convergenceQuatC = true;
@@ -391,20 +399,19 @@ public class MultiSimulationController implements Runnable {
 
 				// convergence present in the quaternionError and in the angular velocity error
 				// so initial conditions are inside the domain of attraction
+				// evaluate the initial conditions
+				final Rotation initialR = s.initialAttitudeS.getRotation();
+				final RealVector initialConditionAngularVelocity = new ArrayRealVector(s.initialAttitudeS.getSpin().toArray());
+				final double[] initialConditionEulerAngles = new double[] {
+						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[0]),
+						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[1]),
+						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[2])};
+				final RealVector initialConditionAttitude = new ArrayRealVector(new double[] { 
+						initialR.getQ1(),
+						initialR.getQ2(),
+						initialR.getQ3(), 
+						1-FastMath.abs(initialR.getQ0())}); // adjusting to origin 0
 				if (convergenceQuat && convergenceAng) {
-					// evaluate the initial conditions
-					final Rotation initialR = s.initialAttitudeS.getRotation();
-					final RealVector initialConditionAngularVelocity = new ArrayRealVector(s.initialAttitudeS.getSpin().toArray());
-					final double[] initialConditionEulerAngles = new double[] {
-							FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[0]),
-							FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[1]),
-							FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[2])};
-					final RealVector initialConditionAttitude = new ArrayRealVector(new double[] { 
-							initialR.getQ1(),
-							initialR.getQ2(),
-							initialR.getQ3(), 
-							1-FastMath.abs(initialR.getQ0())}); // adjusting to origin 0
-					
 					logger.info("Inside domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
 							controller, 
 							initialConditionAttitude,
@@ -419,6 +426,22 @@ public class MultiSimulationController implements Runnable {
 					domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
 					domainOfAttractionAngularVelocity.get(controller).put(i, 
 							initialConditionAngularVelocity.toArray());
+				} else {
+					logger.info("OUTSIDE domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+							controller, 
+							initialConditionAttitude,
+							initialConditionAttitude.getNorm(),
+							initialConditionEulerAngles, 
+							initialConditionAngularVelocity,
+							initialConditionAngularVelocity.getNorm());
+
+					complementDomainOfAttractionNorm.get(controller).put(i, new double[] {
+							initialConditionAttitude.getNorm(),
+							initialConditionAngularVelocity.getNorm()});
+					complementDomainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
+					complementDomainOfAttractionAngularVelocity.get(controller).put(i, 
+							initialConditionAngularVelocity.toArray());
+
 				}
 				
 				convergenceAngC = convergenceAngC && convergenceAng;
@@ -447,10 +470,18 @@ public class MultiSimulationController implements Runnable {
 		logger.info(vectorialQuaternionErrorStd.entrySet().toString());
 		logger.info(stateSpaceStd.entrySet().toString());
 		for (String controller : mapSimulations.keySet()) {
-			logger.info("DOMAIN OF ATTRACTION - NORM - Controller {} - Samples {} Converged {}", 
+			logger.info("DOMAIN OF ATTRACTION - CONVERGED - Controller {} - Samples: {}, NORM: {}, Attitude: {}, Angular Velocity: {}", 
 					controller, 
 					mapSimulations.get(controller).size(), 
-					domainOfAttractionNorm.get(controller).size());
+					domainOfAttractionNorm.get(controller).size(),
+					domainOfAttractionAttitude.get(controller).size(),
+					domainOfAttractionAngularVelocity.get(controller).size());
+			logger.info("DOMAIN OF ATTRACTION - NOT CONVERGED - Controller {} - Samples: {}, NORM: {}, Attitude: {}, Angular Velocity: {}", 
+					controller, 
+					mapSimulations.get(controller).size(), 
+					complementDomainOfAttractionNorm.get(controller).size(),
+					complementDomainOfAttractionAttitude.get(controller).size(),
+					complementDomainOfAttractionAngularVelocity.get(controller).size());
 		}
 		
 		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of L2 Norm of Quaternion Error");
@@ -459,6 +490,9 @@ public class MultiSimulationController implements Runnable {
 		Plotter.plot2DScatterInitialConditions(domainOfAttractionNorm, "Domain of Attraction - Norm");
 		Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude");
 		Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity");
+		Plotter.plot2DScatterInitialConditions(complementDomainOfAttractionNorm, "COMPLEMENT Domain of Attraction - Norm");
+		Plotter.plot3DScatterStateSpace(complementDomainOfAttractionAttitude, "COMPLEMENT Domain of Attraction - Attitude");
+		Plotter.plot3DScatterStateSpace(complementDomainOfAttractionAngularVelocity, "COMPLEMENT Domain of Attraction - AngularVelocity");
 		logger.info("Results computed!");
 		logger.info("----------------------------");
 	}
