@@ -77,10 +77,10 @@ public class MultiSimulationController implements Runnable {
 
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					"ProportionalNonLinearQuaternionFullSDREHInfinityController",
-					"ProportionalNonLinearMRPSDREController_FIRST",
-					"ProportionalNonLinearMRPSDREHInfinityController"));
+					"ProportionalNonLinearQuaternionSDREController_GIBBS"));//,
+					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+					//"ProportionalNonLinearMRPSDREController_FIRST",
+					//"ProportionalNonLinearMRPSDREHInfinityController"));
 					//"NopeController"));
 
 	static final private Logger logger = LoggerFactory.getLogger(MultiSimulationController.class);
@@ -92,8 +92,6 @@ public class MultiSimulationController implements Runnable {
 	// FOR STORING INITIAL CONDITIONS
 	final Map<String, Map<Double, double[]>> initialAngles = new TreeMap<String, Map<Double, double[]>>();
 	final Map<String, Map<Double, double[]>> initialAngularVelocities = new TreeMap<String, Map<Double, double[]>>();
-	final Map<String, Map<Double, double[]>> initialAnglesForVisualization = new TreeMap<String, Map<Double, double[]>>();
-
 	
 	/**
 	 * Default constructor.
@@ -406,37 +404,40 @@ public class MultiSimulationController implements Runnable {
 						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[0]),
 						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[1]),
 						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[2])};
+				final RealVector initialConditionEulerAnglesV = new ArrayRealVector(initialConditionEulerAngles); 
 				final RealVector initialConditionAttitude = new ArrayRealVector(new double[] { 
 						initialR.getQ1(),
 						initialR.getQ2(),
 						initialR.getQ3(), 
 						1-FastMath.abs(initialR.getQ0())}); // adjusting to origin 0
 				if (convergenceQuat && convergenceAng) {
-					logger.info("Inside domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+					logger.info("Inside domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
 							controller, 
 							initialConditionAttitude,
 							initialConditionAttitude.getNorm(),
 							initialConditionEulerAngles, 
+							initialConditionEulerAnglesV.getNorm(), 
 							initialConditionAngularVelocity,
 							initialConditionAngularVelocity.getNorm());
 					
 					domainOfAttractionNorm.get(controller).put(i, new double[] {
-							initialConditionAttitude.getNorm(),
+							initialConditionEulerAnglesV.getNorm(),
 							initialConditionAngularVelocity.getNorm()});
 					domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
 					domainOfAttractionAngularVelocity.get(controller).put(i, 
 							initialConditionAngularVelocity.toArray());
 				} else {
-					logger.info("OUTSIDE domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+					logger.info("OUTSIDE domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
 							controller, 
 							initialConditionAttitude,
 							initialConditionAttitude.getNorm(),
 							initialConditionEulerAngles, 
+							initialConditionEulerAnglesV.getNorm(), 
 							initialConditionAngularVelocity,
 							initialConditionAngularVelocity.getNorm());
 
 					complementDomainOfAttractionNorm.get(controller).put(i, new double[] {
-							initialConditionAttitude.getNorm(),
+							initialConditionEulerAnglesV.getNorm(),
 							initialConditionAngularVelocity.getNorm()});
 					complementDomainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
 					complementDomainOfAttractionAngularVelocity.get(controller).put(i, 
@@ -509,9 +510,13 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 		logger.info("Computing initial conditions for {} number of simulations and approach {} (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)...", numberOfSimulations, approach);
 
+		final Map<String, Map<Double, double[]>> initialAnglesForVisualization = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> initialNorm = new TreeMap<String, Map<Double, double[]>>();
+
 		initialAngles.put("initialAngles", new TreeMap<Double, double[]>());
 		initialAngularVelocities.put("initialAngularVelocities", new TreeMap<Double, double[]>());
 		initialAnglesForVisualization.put("initialAnglesForVisualization", new TreeMap<Double, double[]>());
+		initialNorm.put("initialNorm", new TreeMap<Double, double[]>());
 
 		// for checking external boundaries of attractor
 		final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
@@ -622,6 +627,11 @@ public class MultiSimulationController implements Runnable {
 							initialAttitudeEulerAngles[2]);
 					Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
 					initialAnglesForVisualization.get("initialAnglesForVisualization").put((double)i, init3d.toArray());
+					// showing norm of initial conditions
+					final RealVector initialConditionEulerAnglesV = new ArrayRealVector(initialAttitudeEulerAngles); 
+					final RealVector initialConditionAngularVelocityV = new ArrayRealVector(initialAngularVelocity); 
+					initialNorm.get("initialNorm").put((double)i, new double[] { initialConditionEulerAnglesV.getNorm(),
+																				 initialConditionAngularVelocityV.getNorm()});
 				}
 	
 			}
@@ -714,6 +724,11 @@ public class MultiSimulationController implements Runnable {
 												initialAttitudeEulerAngles[2]);
 										Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
 										initialAnglesForVisualization.get("initialAnglesForVisualization").put((double)i, init3d.toArray());
+										// showing norm of initial conditions
+										final RealVector initialConditionEulerAnglesV = new ArrayRealVector(initialAttitudeEulerAngles); 
+										final RealVector initialConditionAngularVelocityV = new ArrayRealVector(initialAngularVelocity); 
+										initialNorm.get("initialNorm").put((double)i, new double[] { initialConditionEulerAnglesV.getNorm(),
+																									 initialConditionAngularVelocityV.getNorm()});
 									}
 								}
 							}
@@ -726,6 +741,7 @@ public class MultiSimulationController implements Runnable {
 		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") Euler Angles");
 		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
 		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
+		Plotter.plot2DScatterInitialConditions(initialNorm, "Initial Conditions - Norm");
 
 		logger.info("{} initial conditions computed!", initialAngles.get("initialAngles").size());
 		logger.info("----------------------------");

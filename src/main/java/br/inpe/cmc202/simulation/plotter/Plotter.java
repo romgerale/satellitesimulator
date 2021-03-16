@@ -574,7 +574,7 @@ public class Plotter {
 		Plot2DPanel plot = new Plot2DPanel();
 		plot.addLegend("SOUTH");
 		plot.addScatterPlot("Origin", new double[] { 0 }, new double[] { 0 });
-		plot.setAxisLabels("norm of quaternion", "norm of angular velocity");
+		plot.setAxisLabels("norm of Euler Angles", "norm of angular velocity");
 
 		for (String initialState : mmap.keySet()) {
 			// formatting data
