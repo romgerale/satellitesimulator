@@ -126,7 +126,7 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 				}
 				// INITIAL CONDITIONS
 				// showing initial Euler angles as rotations of the unit vector
-				final Rotation rot = new Rotation(RotationOrder.XYZ, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
+				final Rotation rot = new Rotation(RotationOrder.ZYX, RotationConvention.FRAME_TRANSFORM, initialAttitudeEulerAngles[0], 
 						initialAttitudeEulerAngles[1], 
 						initialAttitudeEulerAngles[2]);
 				Vector3D init3d = rot.applyTo(new Vector3D(1,1,1));
