@@ -90,6 +90,7 @@ public class MultiSimulationController implements Runnable {
 	// FOR STORING
 	final List<Runnable> listSimulations = new ArrayList<Runnable>();
 	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
+	final Map<String, List<SimulationController>> mapSimulationsNotConverged = new HashMap<String, List<SimulationController>>();
 
 	// FOR STORING RUNNABLE QUEUE
 	// queue
@@ -134,14 +135,28 @@ public class MultiSimulationController implements Runnable {
 				// to check convergence and to clean the list of simulations
 				Runnable s2 = new Runnable() {
 					SimulationController storedSimulationController;
+					String storedController;
 					{
-						this.storedSimulationController=s;
+						this.storedSimulationController = s;
+						this.storedController = controller;
 					}
 					
 					@Override
 					public void run() {
 						storedSimulationController.run();
-						storedSimulationController.checkConvergence();
+						final boolean convergence = storedSimulationController.checkConvergence();
+						if (!convergence) {
+							// adding to not converged
+							List<SimulationController> lnc = mapSimulationsNotConverged.get(storedController);
+							if (lnc == null) {
+								lnc = new ArrayList<SimulationController>();
+								mapSimulationsNotConverged.put(storedController, lnc);
+							}
+							lnc.add(storedSimulationController);
+							// removing from converged
+							List<SimulationController> l = mapSimulations.get(controller);
+							l.remove(storedSimulationController);
+						}
 					}
 					
 				};
@@ -171,6 +186,9 @@ public class MultiSimulationController implements Runnable {
 		computeResults();
 
 		plotSimulations();
+		
+		plotDomainOfAttraction(mapSimulations, "CONVERGED");
+		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED");
 	}
 
 	/**
@@ -325,39 +343,23 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
 				
-		final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
-		final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
+		boolean someValueComputed = false;
+		
+		//final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
+		//final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
 		final Map<String, Map<Double, Double>> stateSpaceStd = new TreeMap<String, Map<Double, Double>>();
-
-		final Map<String, Map<Double, double[]>> domainOfAttractionNorm = new TreeMap<String, Map<Double, double[]>>();
-		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
-		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
-
-		final Map<String, Map<Double, double[]>> complementDomainOfAttractionNorm = new TreeMap<String, Map<Double, double[]>>();
-		final Map<String, Map<Double, double[]>> complementDomainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
-		final Map<String, Map<Double, double[]>> complementDomainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
 
 		// for each controller
 		for (String controller : mapSimulations.keySet()) {
 			double i = 0d;
-			final Map<Double, Double> valuesAng = new TreeMap<Double, Double>();
-			final Map<Double, Double> valuesQuat = new TreeMap<Double, Double>();
+			//final Map<Double, Double> valuesAng = new TreeMap<Double, Double>();
+			//final Map<Double, Double> valuesQuat = new TreeMap<Double, Double>();
 			final Map<Double, Double> valuesStateSpace = new TreeMap<Double, Double>();
-
-			domainOfAttractionNorm.put(controller, new TreeMap<Double, double[]>());
-			domainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
-			domainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
-
-			complementDomainOfAttractionNorm.put(controller, new TreeMap<Double, double[]>());
-			complementDomainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
-			complementDomainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
-
-			boolean convergenceStateSpaceC = true;
 
 			// for each simulation for a given controller
 			for (SimulationController s : mapSimulations.get(controller)) {
-				final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
-				final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
+				//final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
+				//final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
 				final DescriptiveStatistics normStateSpace = new DescriptiveStatistics();
 				
 				for (Double t : s.stepHandler.quaternionError.keySet()) {
@@ -369,7 +371,7 @@ public class MultiSimulationController implements Runnable {
 							quartenionError[2], 
 							1-FastMath.abs(quartenionError[3])}); // adjusting to origin 0
 					logger.debug("Norm of Vectorial Part of Quaternion Error {} {}",controller, quaternion.getNorm());
-					normVectorialQuaternionError.addValue(quaternion.getNorm());
+					//normVectorialQuaternionError.addValue(quaternion.getNorm());
 
 					// calculate statistics of the norm of angular velocity
 					final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
@@ -378,7 +380,7 @@ public class MultiSimulationController implements Runnable {
 							angularVelocityError[1],
 							angularVelocityError[2]});
 					logger.debug("Norm of Angular Velocity {} {}",controller, angularVelocity.getNorm());
-					normAngularVelocity.addValue(angularVelocity.getNorm());
+					//normAngularVelocity.addValue(angularVelocity.getNorm());
 					
 					// calculate statistics of the norm of state space: 
 					// quaternion (last entry as scalar and adjusted to origin) 
@@ -393,95 +395,98 @@ public class MultiSimulationController implements Runnable {
 							angularVelocityError[2]});
 					logger.info("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
 					normStateSpace.addValue(stateSpace.getNorm());
+					
+					someValueComputed = true;
 				}
 												
-				valuesQuat.put(++i, normVectorialQuaternionError.getPercentile(90d));
-				valuesAng.put(i, normAngularVelocity.getPercentile(90d));
-				valuesStateSpace.put(i, normStateSpace.getPercentile(90));
+				//valuesQuat.put(++i, normVectorialQuaternionError.getStandardDeviation());
+				//valuesAng.put(i, normAngularVelocity.getStandardDeviation());
+				valuesStateSpace.put(i, normStateSpace.getStandardDeviation());
 
-				final boolean convergence = s.checkConvergence();
-				// convergence present in the quaternionError and in the angular velocity error
-				// so initial conditions are inside the domain of attraction
-				// evaluate the initial conditions
-				final RealVector initialConditionEulerAnglesV = s.getEulerAnglesOfInitialCondition();
-				final RealVector initialConditionAngularVelocity = s.getAngularVelocityOfInitialCondition();
-				
-				if (convergence) {
-					logger.info("Inside domain of attraction! Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
-							controller, 
-							initialConditionEulerAnglesV, 
-							initialConditionEulerAnglesV.getNorm(), 
-							initialConditionAngularVelocity,
-							initialConditionAngularVelocity.getNorm());
-					
-					domainOfAttractionNorm.get(controller).put(i, new double[] {
-							initialConditionEulerAnglesV.getNorm(),
-							initialConditionAngularVelocity.getNorm()});
-					domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAnglesV.toArray());
-					domainOfAttractionAngularVelocity.get(controller).put(i, 
-							initialConditionAngularVelocity.toArray());
-				} else {
-					logger.info("OUTSIDE domain of attraction! Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
-							controller, 
-							initialConditionEulerAnglesV.toArray(), 
-							initialConditionEulerAnglesV.getNorm(), 
-							initialConditionAngularVelocity,
-							initialConditionAngularVelocity.getNorm());
-
-					complementDomainOfAttractionNorm.get(controller).put(i, new double[] {
-							initialConditionEulerAnglesV.getNorm(),
-							initialConditionAngularVelocity.getNorm()});
-					complementDomainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAnglesV.toArray());
-					complementDomainOfAttractionAngularVelocity.get(controller).put(i, 
-							initialConditionAngularVelocity.toArray());
-
-				}
-				
-				convergenceStateSpaceC = convergenceStateSpaceC && convergence;
 			}
 
-			if (convergenceStateSpaceC) {
-				angularVelocityStd.put(controller, valuesAng);
-				vectorialQuaternionErrorStd.put(controller, valuesQuat);
-				stateSpaceStd.put(controller,  valuesStateSpace);
-			} else {
-				angularVelocityStd.put(controller+"_UNSTABLE", valuesAng);
-				vectorialQuaternionErrorStd.put(controller+ "_UNSTABLE", valuesQuat);
-				stateSpaceStd.put(controller+"_UNSTABLE",  valuesStateSpace);
-			}
+			//angularVelocityStd.put(controller, valuesAng);
+			//vectorialQuaternionErrorStd.put(controller, valuesQuat);
+			stateSpaceStd.put(controller,  valuesStateSpace);
 		}
 
-		logger.info(angularVelocityStd.entrySet().toString());
-		logger.info(vectorialQuaternionErrorStd.entrySet().toString());
+		//logger.info(angularVelocityStd.entrySet().toString());
+		//logger.info(vectorialQuaternionErrorStd.entrySet().toString());
 		logger.info(stateSpaceStd.entrySet().toString());
-		for (String controller : mapSimulations.keySet()) {
-			logger.info("DOMAIN OF ATTRACTION - CONVERGED - Controller {} - Samples: {}, NORM: {}, Attitude: {}, Angular Velocity: {}", 
-					controller, 
-					mapSimulations.get(controller).size(), 
-					domainOfAttractionNorm.get(controller).size(),
-					domainOfAttractionAttitude.get(controller).size(),
-					domainOfAttractionAngularVelocity.get(controller).size());
-			logger.info("DOMAIN OF ATTRACTION - NOT CONVERGED - Controller {} - Samples: {}, NORM: {}, Attitude: {}, Angular Velocity: {}", 
-					controller, 
-					mapSimulations.get(controller).size(), 
-					complementDomainOfAttractionNorm.get(controller).size(),
-					complementDomainOfAttractionAttitude.get(controller).size(),
-					complementDomainOfAttractionAngularVelocity.get(controller).size());
-		}
 		
-		Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of L2 Norm of Quaternion Error");
-		Plotter.plot2DLine(angularVelocityStd, "Statistics of L2 Norm of Angular Velocity");
-		Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
-		Plotter.plot2DScatterInitialConditions(domainOfAttractionNorm, "Domain of Attraction - Norm");
-		Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude");
-		Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity");
-		Plotter.plot2DScatterInitialConditions(complementDomainOfAttractionNorm, "COMPLEMENT Domain of Attraction - Norm");
-		Plotter.plot3DScatterStateSpace(complementDomainOfAttractionAttitude, "COMPLEMENT Domain of Attraction - Attitude");
-		Plotter.plot3DScatterStateSpace(complementDomainOfAttractionAngularVelocity, "COMPLEMENT Domain of Attraction - AngularVelocity");
-		logger.info("Results computed!");
+		if (someValueComputed) {
+			//Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of L2 Norm of Quaternion Error");
+			//Plotter.plot2DLine(angularVelocityStd, "Statistics of L2 Norm of Angular Velocity");
+			Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
+		}
+		logger.info("Results computed {}!", someValueComputed);
 		logger.info("----------------------------");
 	}
 	
+	
+	/**
+	 * For calculating statistics.
+	 * 
+	 */
+	protected void plotDomainOfAttraction(Map<String, List<SimulationController>> simulations, String label) {
+		logger.info("----------------------------");
+		logger.info("Plotting Domain of Attraction ({})...", label);
+		
+		boolean hasSomeDomainOfAttraction = false;
+
+		final Map<String, Map<Double, double[]>> domainOfAttractionNorm = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
+
+		// CONVERGED - for each controller
+		for (String controller : simulations.keySet()) {
+			double i = 0d;
+
+			domainOfAttractionNorm.put(controller, new TreeMap<Double, double[]>());
+			domainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
+			domainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
+
+			// for each simulation for a given controller
+			for (SimulationController s : simulations.get(controller)) {
+
+				final RealVector initialConditionEulerAnglesV = s.getEulerAnglesOfInitialCondition();
+				final RealVector initialConditionAngularVelocity = s.getAngularVelocityOfInitialCondition();
+				
+				logger.info("Inside domain of attraction ({})! Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+						label, 
+						controller, 
+						initialConditionEulerAnglesV, 
+						initialConditionEulerAnglesV.getNorm(), 
+						initialConditionAngularVelocity,
+						initialConditionAngularVelocity.getNorm());
+				
+				hasSomeDomainOfAttraction = true;
+				domainOfAttractionNorm.get(controller).put(++i, new double[] {
+						initialConditionEulerAnglesV.getNorm(),
+						initialConditionAngularVelocity.getNorm()});
+				domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAnglesV.toArray());
+				domainOfAttractionAngularVelocity.get(controller).put(i, 
+						initialConditionAngularVelocity.toArray());
+
+			}
+		}
+
+		if (hasSomeDomainOfAttraction) {
+			Plotter.plot2DScatterInitialConditions(domainOfAttractionNorm, "Domain of Attraction - Norm " + label);
+			Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
+			Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
+			for (String controller : simulations.keySet()) {
+				logger.info("DOMAIN OF ATTRACTION - {} - Controller {} - Samples: {}",
+						label,
+						controller, 
+						simulations.get(controller).size());
+			}
+		}
+		
+		logger.info("Domain of Attraction ({}) plotted {}!", label, hasSomeDomainOfAttraction);
+		logger.info("----------------------------");
+	}
+
 	//****
 	/**
 	 * For computing initial conditions for simulations.
