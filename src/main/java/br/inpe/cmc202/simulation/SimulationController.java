@@ -3,12 +3,16 @@ package br.inpe.cmc202.simulation;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.hipparchus.exception.DummyLocalizable;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.RotationOrder;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.RealVector;
 import org.hipparchus.util.FastMath;
 import org.orekit.attitudes.Attitude;
 import org.orekit.errors.OrekitException;
@@ -397,7 +401,7 @@ public class SimulationController implements Runnable {
 		// DATE INITIAL CONDITION
 		// ----------------------------------------
 		if (simulationConfiguration.isEmpty()) {
-			// 01/06/2017 às 11:00 GMT.
+			// 01/06/2017 ï¿½s 11:00 GMT.
 			this.startTime = new AbsoluteDate(2017, 6, 1, 11, 0, 0, TimeScalesFactory.getUTC());
 
 			// ORBIT PARAMETERS
@@ -538,6 +542,70 @@ public class SimulationController implements Runnable {
 
 	}
 
+	/**
+	 * Check convergence in the final of the simulation.
+	 */
+	protected boolean checkConvergence() {
+		boolean convergenceStateSpace = true;
+
+		if (this.stepHandler.currentTime * this.step < this.simulationTime ) {
+			throw new RuntimeException("Check convergence must be only called at the final of the simulation!");
+		}
+		
+		// getting last 5% of time TO TEST CONVERGENCE
+		final double tToTestConvergence = this.stepHandler.lastStoredTime - (this.stepHandler.lastStoredTime * .05d);
+		logger.info("time to test convergence {}",tToTestConvergence);
+		
+		// filtering times to evaluate
+		final Set<Double> timesToEvaluate = new TreeSet<Double>(this.stepHandler.quaternionError.keySet());
+		timesToEvaluate.removeIf(v -> v < tToTestConvergence );
+
+		final double epsilon = 1.E-5;
+		for (final Double t : timesToEvaluate) {
+			final double[] quaternionError = this.stepHandler.quaternionError.get(t);
+			final double[] angularVelocityError = this.stepHandler.angularVelocityBody.get(t);
+			// compute the norm of state space: 
+			// quaternion (last entry as scalar and adjusted to origin) 
+			// and angular velocity
+			final RealVector stateSpace = new ArrayRealVector(new double[] { 
+					quaternionError[0],
+					quaternionError[1],
+					quaternionError[2], 
+					1-FastMath.abs(quaternionError[3]), // adjusting to origin 0
+					angularVelocityError[0],
+					angularVelocityError[1],
+					angularVelocityError[2]});
+			if (stateSpace.getNorm() > epsilon) {
+				convergenceStateSpace = false;
+			}
+		}
+
+		logger.info("convergence {} epsilon {}", convergenceStateSpace, epsilon);
+
+		return convergenceStateSpace;
+	}
+	
+	/**
+	 * Returns the initial angular velocities.
+	 */
+	protected RealVector getAngularVelocityOfInitialCondition() {
+		final RealVector initialConditionAngularVelocity = new ArrayRealVector(this.initialAttitudeS.getSpin().toArray());
+		return initialConditionAngularVelocity;
+	}
+	
+	/**
+	 * Returns the initial Euler angles.
+	 */
+	protected RealVector getEulerAnglesOfInitialCondition() {
+		final double[] initialAnglesRadians = this.initialAttitudeS.getRotation().getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR);
+		final double[] initialConditionEulerAngles = new double[] {
+				FastMath.toDegrees(initialAnglesRadians[0]),
+				FastMath.toDegrees(initialAnglesRadians[1]),
+				FastMath.toDegrees(initialAnglesRadians[2])};
+		final RealVector initialConditionEulerAnglesV = new ArrayRealVector(initialConditionEulerAngles);
+		return initialConditionEulerAnglesV;
+	}
+	
 	/**
 	 * Entry point for the simulation.
 	 * 

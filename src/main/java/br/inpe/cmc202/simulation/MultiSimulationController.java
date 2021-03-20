@@ -134,7 +134,6 @@ public class MultiSimulationController implements Runnable {
 				// to check convergence and to clean the list of simulations
 				Runnable s2 = new Runnable() {
 					SimulationController storedSimulationController;
-					BlockingQueue<Runnable> queue;
 					{
 						this.storedSimulationController=s;
 					}
@@ -142,7 +141,7 @@ public class MultiSimulationController implements Runnable {
 					@Override
 					public void run() {
 						storedSimulationController.run();
-						logger.debug("Checking convergence...");
+						storedSimulationController.checkConvergence();
 					}
 					
 				};
@@ -353,8 +352,6 @@ public class MultiSimulationController implements Runnable {
 			complementDomainOfAttractionAttitude.put(controller, new TreeMap<Double, double[]>());
 			complementDomainOfAttractionAngularVelocity.put(controller, new TreeMap<Double, double[]>());
 
-			boolean convergenceAngC = true;
-			boolean convergenceQuatC = true;
 			boolean convergenceStateSpaceC = true;
 
 			// for each simulation for a given controller
@@ -362,14 +359,6 @@ public class MultiSimulationController implements Runnable {
 				final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
 				final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
 				final DescriptiveStatistics normStateSpace = new DescriptiveStatistics();
-
-				boolean convergenceAng = true;
-				boolean convergenceQuat = true;
-				boolean convergenceStateSpace = true;
-				
-				// getting last 5% of time TO TEST CONVERGENCE
-				final double tToTestConvergence = s.stepHandler.lastStoredTime - (s.stepHandler.lastStoredTime * .05d);
-				logger.info("time to test convergence {}",tToTestConvergence);
 				
 				for (Double t : s.stepHandler.quaternionError.keySet()) {
 					// calculate statistics of the norm of vectorial part of quaternion 
@@ -381,9 +370,6 @@ public class MultiSimulationController implements Runnable {
 							1-FastMath.abs(quartenionError[3])}); // adjusting to origin 0
 					logger.debug("Norm of Vectorial Part of Quaternion Error {} {}",controller, quaternion.getNorm());
 					normVectorialQuaternionError.addValue(quaternion.getNorm());
-					if (t > tToTestConvergence && quaternion.getNorm() > 1.E-2) {
-						convergenceQuat = false;
-					}
 
 					// calculate statistics of the norm of angular velocity
 					final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
@@ -393,9 +379,6 @@ public class MultiSimulationController implements Runnable {
 							angularVelocityError[2]});
 					logger.debug("Norm of Angular Velocity {} {}",controller, angularVelocity.getNorm());
 					normAngularVelocity.addValue(angularVelocity.getNorm());
-					if (t > tToTestConvergence && angularVelocity.getNorm() > 1.E-2) {
-						convergenceAng = false;
-					}
 					
 					// calculate statistics of the norm of state space: 
 					// quaternion (last entry as scalar and adjusted to origin) 
@@ -410,36 +393,23 @@ public class MultiSimulationController implements Runnable {
 							angularVelocityError[2]});
 					logger.info("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
 					normStateSpace.addValue(stateSpace.getNorm());
-					if (t > tToTestConvergence && stateSpace.getNorm() > 1.E-2) {
-						convergenceStateSpace = false;
-					}
 				}
 												
 				valuesQuat.put(++i, normVectorialQuaternionError.getPercentile(90d));
 				valuesAng.put(i, normAngularVelocity.getPercentile(90d));
 				valuesStateSpace.put(i, normStateSpace.getPercentile(90));
 
+				final boolean convergence = s.checkConvergence();
 				// convergence present in the quaternionError and in the angular velocity error
 				// so initial conditions are inside the domain of attraction
 				// evaluate the initial conditions
-				final Rotation initialR = s.initialAttitudeS.getRotation();
-				final RealVector initialConditionAngularVelocity = new ArrayRealVector(s.initialAttitudeS.getSpin().toArray());
-				final double[] initialConditionEulerAngles = new double[] {
-						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[0]),
-						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[1]),
-						FastMath.toDegrees(initialR.getAngles(RotationOrder.ZYX, RotationConvention.VECTOR_OPERATOR)[2])};
-				final RealVector initialConditionEulerAnglesV = new ArrayRealVector(initialConditionEulerAngles); 
-				final RealVector initialConditionAttitude = new ArrayRealVector(new double[] { 
-						initialR.getQ1(),
-						initialR.getQ2(),
-						initialR.getQ3(), 
-						1-FastMath.abs(initialR.getQ0())}); // adjusting to origin 0
-				if (convergenceQuat && convergenceAng) {
-					logger.info("Inside domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+				final RealVector initialConditionEulerAnglesV = s.getEulerAnglesOfInitialCondition();
+				final RealVector initialConditionAngularVelocity = s.getAngularVelocityOfInitialCondition();
+				
+				if (convergence) {
+					logger.info("Inside domain of attraction! Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
 							controller, 
-							initialConditionAttitude,
-							initialConditionAttitude.getNorm(),
-							initialConditionEulerAngles, 
+							initialConditionEulerAnglesV, 
 							initialConditionEulerAnglesV.getNorm(), 
 							initialConditionAngularVelocity,
 							initialConditionAngularVelocity.getNorm());
@@ -447,15 +417,13 @@ public class MultiSimulationController implements Runnable {
 					domainOfAttractionNorm.get(controller).put(i, new double[] {
 							initialConditionEulerAnglesV.getNorm(),
 							initialConditionAngularVelocity.getNorm()});
-					domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
+					domainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAnglesV.toArray());
 					domainOfAttractionAngularVelocity.get(controller).put(i, 
 							initialConditionAngularVelocity.toArray());
 				} else {
-					logger.info("OUTSIDE domain of attraction! Controller: {}, Initial Attitude: {}, Norm - Initial Attitude: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+					logger.info("OUTSIDE domain of attraction! Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
 							controller, 
-							initialConditionAttitude,
-							initialConditionAttitude.getNorm(),
-							initialConditionEulerAngles, 
+							initialConditionEulerAnglesV.toArray(), 
 							initialConditionEulerAnglesV.getNorm(), 
 							initialConditionAngularVelocity,
 							initialConditionAngularVelocity.getNorm());
@@ -463,32 +431,24 @@ public class MultiSimulationController implements Runnable {
 					complementDomainOfAttractionNorm.get(controller).put(i, new double[] {
 							initialConditionEulerAnglesV.getNorm(),
 							initialConditionAngularVelocity.getNorm()});
-					complementDomainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAngles);
+					complementDomainOfAttractionAttitude.get(controller).put(i, initialConditionEulerAnglesV.toArray());
 					complementDomainOfAttractionAngularVelocity.get(controller).put(i, 
 							initialConditionAngularVelocity.toArray());
 
 				}
 				
-				convergenceAngC = convergenceAngC && convergenceAng;
-				convergenceQuatC = convergenceQuatC && convergenceQuat;
-				convergenceStateSpaceC = convergenceStateSpaceC && convergenceStateSpace;
+				convergenceStateSpaceC = convergenceStateSpaceC && convergence;
 			}
 
-			if (convergenceAngC) {
-				angularVelocityStd.put(controller, valuesAng);
-			} else {
-				angularVelocityStd.put(controller+"_UNSTABLE", valuesAng);
-			}
-			if (convergenceQuatC) {
-				vectorialQuaternionErrorStd.put(controller, valuesQuat);
-			} else {
-				vectorialQuaternionErrorStd.put(controller+ "_UNSTABLE", valuesQuat);
-			}
 			if (convergenceStateSpaceC) {
+				angularVelocityStd.put(controller, valuesAng);
+				vectorialQuaternionErrorStd.put(controller, valuesQuat);
 				stateSpaceStd.put(controller,  valuesStateSpace);
 			} else {
+				angularVelocityStd.put(controller+"_UNSTABLE", valuesAng);
+				vectorialQuaternionErrorStd.put(controller+ "_UNSTABLE", valuesQuat);
 				stateSpaceStd.put(controller+"_UNSTABLE",  valuesStateSpace);
-			}			
+			}
 		}
 
 		logger.info(angularVelocityStd.entrySet().toString());
