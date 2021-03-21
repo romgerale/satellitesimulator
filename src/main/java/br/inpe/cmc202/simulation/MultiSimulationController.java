@@ -313,8 +313,8 @@ public class MultiSimulationController implements Runnable {
 				details += "\n" + detail;
 			}
 			details += "";
-			logger.info("**** ");
-			logger.info(details);
+			// logger.info("**** ");
+			// logger.info(details);
 			Plotter.plot2DLine(quaternionError, key, "quaternion error", details);
 			Plotter.plot2DLine(angularVelocity, key, "angular velocity", details);
 			Plotter.plot2DLine(detControllability, key + " detControllability", false);
@@ -326,7 +326,7 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot3DScatterStateSpace(vetAngularVelocity, key + " state space velocity - BODY", false);
 
 			// H-INFINITY
-			Plotter.plot2DLine(gama, key + " gama");
+			Plotter.plot2DLine(gama, key + " gama", false);
 			// Track numerical Errors
 			Plotter.plot2DLine(conditionNumberA, key + " conditionNumberA", false);
 			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors", false);
@@ -632,10 +632,14 @@ public class MultiSimulationController implements Runnable {
 					// filtering results
 					Map<Double, Double> filteredData = new TreeMap<Double, Double>();
 					final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
-					final int numberOfIntervals = x.length > 100 ? 100 : x.length;
+					final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
 					final double start = x[0];
 					final double end = x[x.length-1];
 					final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
+					
+					// first point "FAKE" reusing y and x=0
+					filteredData.put(0d, data.get(start));
+					
 					int j = 0;
 					for (int k = 0; k < x.length; ) {
 						final double startInterval = start + lengthIntervalToAggregate * j;
@@ -652,9 +656,12 @@ public class MultiSimulationController implements Runnable {
 							currentX = x[k];
 						}
 						j++;
-						if (maxY > 0 ) filteredData.put(initialX, maxY);
+						if (maxY > 0 ) filteredData.put(x[k-1], maxY);
 					}
-					
+
+					// last point "FAKE" reusing x and y=0
+					filteredData.put(end+1E-10, 0d);
+
 					domainOfAttractionNormShape.put(controller, filteredData);
 				}
 
@@ -707,7 +714,7 @@ public class MultiSimulationController implements Runnable {
 
 		// standard deviation
 		final double STD_ANGLE = 180d/3d;
-		final double STD_ANGULAR_VELOCITY = FastMath.max(FastMath.max(max.getEntry(0), max.getEntry(1)), max.getEntry(2))/3d;
+		final double STD_ANGULAR_VELOCITY = max.getLInfNorm()/3d;
 
 		// MONTE CARLO PARAMETERS - UNIFORM
 		// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
@@ -723,8 +730,8 @@ public class MultiSimulationController implements Runnable {
 		//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
 		//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
 
-		final double LOWER_ANGULAR_VELOCITY = -1 * FastMath.max(FastMath.max(max.getEntry(0), max.getEntry(1)), max.getEntry(2));//-15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-		final double UPPER_ANGULAR_VELOCITY = FastMath.max(FastMath.max(max.getEntry(0), max.getEntry(1)), max.getEntry(2));//15E-3d; //1E-1d // too big
+		final double LOWER_ANGULAR_VELOCITY = -1 * max.getLInfNorm();//-15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+		final double UPPER_ANGULAR_VELOCITY = max.getLInfNorm();//15E-3d; //1E-1d // too big
 
 		// INITIAL CONDITIONS 
 		//*********************************
@@ -749,7 +756,7 @@ public class MultiSimulationController implements Runnable {
 				if (approach == 0 ) {
 					// NORMAL
 					initialAttitudeEulerAngles[0] = gaussianAnglesX.nextNormal(MEAN_ANGLE, STD_ANGLE);
-					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextNormal(MEAN_ANGLE/2d, STD_ANGLE/2d); // intermediary axis has a "smaller range
+					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextNormal(MEAN_ANGLE, STD_ANGLE/3d); // intermediary axis has a "smaller range" pi/2
 					initialAttitudeEulerAngles[2] = gaussianAnglesZ.nextNormal(MEAN_ANGLE, STD_ANGLE);
 							
 					initialAngularVelocity[0] = gaussianVelocityX.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY);
@@ -759,7 +766,7 @@ public class MultiSimulationController implements Runnable {
 				} else {
 					// UNIFORM
 					initialAttitudeEulerAngles[0] = gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
-					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextUniform(LOWER_ANGLE/2d, UPPER_ANGLE/2d); // intermediary axis has a "smaller range
+					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextUniform(LOWER_ANGLE/2d, UPPER_ANGLE/2d); // intermediary axis has a "smaller range" pi/2
 					initialAttitudeEulerAngles[2] = gaussianAnglesZ.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
 							
 					initialAngularVelocity[0] = gaussianVelocityX.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY);

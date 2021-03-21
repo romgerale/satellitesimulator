@@ -5,7 +5,7 @@
 			<PatternLayout
 				pattern="%d{HH:mm:ss.SSS} [%t] %-4level %logger{8} %X{date} - %msg%n" />
 		</Console>
-		<File name="File" fileName="target/all-${date:yyyy-MM-dd_hh-mm-ss}.log" immediateFlush="false" append="false">
+		<File name="File" fileName="target/all-${date:yyyy-MM-dd_hh-mm-ss}.log" immediateFlush="true" append="false">
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-4level %logger{8} %X{date} - %msg%n"/>
         </File>
 	</Appenders>
