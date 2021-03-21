@@ -499,6 +499,19 @@ public class Plotter {
 		});
 
 	}
+	
+	/*
+	 * General use 3d scatter.
+	 * 
+	 * @param toPlot
+	 * @param name
+	 * @para legend
+	 */
+	public static void plot3DScatterStateSpace(
+			Map<String, Map<Double, double[]>> mmap, String name) {
+		plot3DScatterStateSpace(mmap, name, true);
+		}
+	
 
 	/**
 	 * General use 3d scatter.
@@ -507,14 +520,16 @@ public class Plotter {
 	 * @param name
 	 */
 	public static void plot3DScatterStateSpace(
-			Map<String, Map<Double, double[]>> mmap, String name) {
+			Map<String, Map<Double, double[]>> mmap, String name, boolean legend) {
 		if (mmap == null || mmap.isEmpty()) {
 			return;
 		}
 
 		// iterating over initial states
 		Plot3DPanel plot = new Plot3DPanel();
-		plot.addLegend("SOUTH");
+		if (legend) {
+			plot.addLegend("SOUTH");
+		}
 		plot.addScatterPlot("Origin", new double[] { 0 }, new double[] { 0 },
 				new double[] { 0 });
 		for (String initialState : mmap.keySet()) {
@@ -566,9 +581,12 @@ public class Plotter {
 	 * @param toPlot
 	 * @param name
 	 */
-	public static void plot2DScatterInitialConditions(
-			Map<String, Map<Double, double[]>> mmap, String name) {
+	public static void plot2DScatter(
+			Map<String, Map<Double, double[]>> mmap, String name, String[] axisLabels) {
 		if (mmap == null || mmap.isEmpty()) {
+			return;
+		}
+		if (axisLabels.length != 2) {
 			return;
 		}
 
@@ -576,7 +594,7 @@ public class Plotter {
 		Plot2DPanel plot = new Plot2DPanel();
 		plot.addLegend("SOUTH");
 		plot.addScatterPlot("Origin", new double[] { 0 }, new double[] { 0 });
-		plot.setAxisLabels("norm of Euler Angles", "norm of angular velocity");
+		plot.setAxisLabels(axisLabels[0], axisLabels[1]);
 
 		for (String initialState : mmap.keySet()) {
 			// formatting data
