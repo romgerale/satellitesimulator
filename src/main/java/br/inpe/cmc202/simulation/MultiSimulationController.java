@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.BlockingQueue;
+import java.util.TreeSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -94,7 +94,7 @@ public class MultiSimulationController implements Runnable {
 
 	// FOR STORING RUNNABLE QUEUE
 	// queue
-	final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
+	ThreadPoolExecutor executorPool;
 
 	// FOR STORING INITIAL CONDITIONS
 	final Map<String, Map<Double, double[]>> initialAngles = new TreeMap<String, Map<Double, double[]>>();
@@ -127,47 +127,86 @@ public class MultiSimulationController implements Runnable {
 
 			final double[] initialAngularVelocity = initialAngularVelocitiesComputed.get((double)i);
 
-			for (String controller : CONTROLLERS) {
+			for (final String controller : CONTROLLERS) {
 				
 				final SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
 						initialAngularVelocity);
 				
 				// to check convergence and to clean the list of simulations
-				Runnable s2 = new Runnable() {
+				class SimulationControllerRunnable implements Runnable {
 					SimulationController storedSimulationController;
-					String storedController;
 					{
 						this.storedSimulationController = s;
-						this.storedController = controller;
 					}
 					
 					@Override
 					public void run() {
+						// running
 						storedSimulationController.run();
+						
+						// checking convergence
 						final boolean convergence = storedSimulationController.checkConvergence();
+						final String controllerName =  storedSimulationController.satellite.getReactionWheelControllerName();
 						if (!convergence) {
 							// adding to not converged
-							List<SimulationController> lnc = mapSimulationsNotConverged.get(storedController);
+							List<SimulationController> lnc = mapSimulationsNotConverged.get(controllerName);
 							if (lnc == null) {
 								lnc = new ArrayList<SimulationController>();
-								mapSimulationsNotConverged.put(storedController, lnc);
+								mapSimulationsNotConverged.put(controllerName, lnc);
 							}
 							lnc.add(storedSimulationController);
 							// removing from converged
-							List<SimulationController> l = mapSimulations.get(controller);
-							l.remove(storedSimulationController);
+							List<SimulationController> l = mapSimulations.get(controllerName);
+							if (l == null) {
+								l = new ArrayList<SimulationController>();
+								mapSimulations.put(controllerName, l);
+							}
+							//l.remove(storedSimulationController);
+							
+							// searching in the next simulations - IN THE QUEUE
+							final double normEulerAngles = storedSimulationController.getEulerAnglesOfInitialCondition().getNorm();
+							final double normAngVelocity = storedSimulationController.getAngularVelocityOfInitialCondition().getNorm();
+							for (Runnable toRun : executorPool.getQueue()) {
+								SimulationController toRunS = ((SimulationControllerRunnable) toRun).storedSimulationController;
+								final String controllerNameToRun = toRunS.satellite.getReactionWheelControllerName();
+								final double normEulerAnglesToRun = toRunS.getEulerAnglesOfInitialCondition().getNorm();
+								final double normAngVelocityToRun = toRunS.getAngularVelocityOfInitialCondition().getNorm();
+								if (controllerNameToRun.equals(controllerName) &&
+										normEulerAnglesToRun > normEulerAngles 
+										&& normAngVelocityToRun > normAngVelocity) {
+									logger.info("Found a simulation that should NOT RUN: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
+											controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
+									// remove from EXECUTOR
+									logger.info("Removing from executor, success: {}!", executorPool.remove(toRun));
+									// adding to not converged
+									lnc.add(toRunS);
+									// removing from converged
+									//l.remove(toRunS);
+								}
+							}
+							
+						} else {
+							// adding to converged
+							List<SimulationController> l = mapSimulations.get(controllerName);
+							if (l == null) {
+								l = new ArrayList<SimulationController>();
+								mapSimulations.put(controllerName, l);
+							}
+							l.add(storedSimulationController);
 						}
 					}
 					
 				};
 
+				Runnable s2 = new SimulationControllerRunnable();
+						
 				listSimulations.add(s2);
-				List<SimulationController> l = mapSimulations.get(controller);
-				if (l == null) {
-					l = new ArrayList<SimulationController>();
-					mapSimulations.put(controller, l);
-				}
-				l.add(s);
+				//List<SimulationController> l = mapSimulations.get(controller);
+				//if (l == null) {
+				//	l = new ArrayList<SimulationController>();
+				//	mapSimulations.put(controller, l);
+				//}
+				//l.add(s);
 			}
 
 		}
@@ -303,8 +342,8 @@ public class MultiSimulationController implements Runnable {
 		// Get the ThreadFactory implementation to use
 		ThreadFactory threadFactory = Executors.defaultThreadFactory();
 		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(numberOfProcessors, numberOfProcessors, 0, TimeUnit.SECONDS,
-				queue, threadFactory);
+		executorPool = new ThreadPoolExecutor(numberOfProcessors, numberOfProcessors, 0, TimeUnit.SECONDS,
+				new LinkedBlockingQueue<Runnable>(), threadFactory);
 
 		// starting threads
 		for (Runnable s : listSimulations) {
@@ -322,7 +361,7 @@ public class MultiSimulationController implements Runnable {
 				logger.info("{} simulations concluded from the total of {} in {} s (queued: {})",
 						executorPool.getCompletedTaskCount(), listSimulations.size(),
 						(System.currentTimeMillis() - start) / 1000d,
-						queue.size());
+						executorPool.getQueue().size());
 			} catch (InterruptedException e) {
 				throw new RuntimeException("Simulation was interrupted", e);
 			}
@@ -342,7 +381,65 @@ public class MultiSimulationController implements Runnable {
 	protected void computeResults() {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
-				
+			
+		
+		// checking convexity for norm
+		// iterating over not converged 
+		// for each controller
+		boolean done = false;
+		while (!done) {
+			done = true;
+			main:
+			for (String controller : new TreeSet<String>(mapSimulationsNotConverged.keySet())) {
+	
+				List<SimulationController> l = mapSimulations.get(controller);
+				if (l == null) {
+					l = new ArrayList<SimulationController>();
+					mapSimulations.put(controller, l);
+				}
+	
+				List<SimulationController> lnc = mapSimulationsNotConverged.get(controller);
+				if (lnc == null) {
+					lnc = new ArrayList<SimulationController>();
+					mapSimulationsNotConverged.put(controller, lnc);
+				}
+	
+				// for each simulation for a given controller
+				List<SimulationController> lnc2check = new ArrayList<SimulationController>(lnc);
+				for (SimulationController s : lnc2check) {
+					
+					final double normEulerAngles = s.getEulerAnglesOfInitialCondition().getNorm();
+					final double normAngVelocity = s.getAngularVelocityOfInitialCondition().getNorm();
+	
+					// searching in convergent to move to NOT CONVERGED if it does not satisfy the condition (convexity)
+					List<SimulationController> l2check = new ArrayList<SimulationController>(l);
+					for (SimulationController s2check : l2check) {
+						// it ran
+						if (s2check.ran()) {
+							final String controllerNameToRun = s2check.satellite.getReactionWheelControllerName();
+							final double normEulerAnglesToRun = s2check.getEulerAnglesOfInitialCondition().getNorm();
+							final double normAngVelocityToRun = s2check.getAngularVelocityOfInitialCondition().getNorm();
+							if (controllerNameToRun.equals(controller) &&
+									normEulerAnglesToRun > normEulerAngles 
+									&& normAngVelocityToRun > normAngVelocity) {
+								logger.info("Found a simulation that is CONVERGENT but it does not satisfy CONVEXITY for NORM: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
+										controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
+								// adding to not converged
+								lnc.add(s2check);
+								// removing from converged
+								l.remove(s2check);
+								done = false;
+								break main; // start again
+							}
+						} else {
+							logger.error("It is not possible to have a convergent simulation that did not run!");
+						}
+					}
+				}
+			}
+		}
+		
+		
 		boolean someValueComputed = false;
 		
 		//final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
@@ -452,9 +549,11 @@ public class MultiSimulationController implements Runnable {
 				final RealVector initialConditionEulerAnglesV = s.getEulerAnglesOfInitialCondition();
 				final RealVector initialConditionAngularVelocity = s.getAngularVelocityOfInitialCondition();
 				
-				logger.info("Inside domain of attraction ({})! Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
+				logger.info("Inside domain of attraction ({})! Run: {}, Converged: {}, Controller: {}, Initial Euler Angles: {}, Norm - Initial Euler Angles: {}, Initial Angular Velocity: {}, Norm - Initial Angular Velocity: {}", 
 						label, 
-						controller, 
+						s.ran(),
+						s.ran() ? s.checkConvergence() : false, 
+						controller,
 						initialConditionEulerAnglesV, 
 						initialConditionEulerAnglesV.getNorm(), 
 						initialConditionAngularVelocity,
@@ -476,10 +575,59 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
 			Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
 			for (String controller : simulations.keySet()) {
-				logger.info("DOMAIN OF ATTRACTION - {} - Controller {} - Samples: {}",
+				
+				int ran = 0;
+				int notRan = 0;
+				double maxAbsEulerAngleX = 0d;
+				double maxAbsEulerAngleY = 0d;
+				double maxAbsEulerAngleZ = 0d;
+				double maxAbsAngVelX = 0d;
+				double maxAbsAngVelY = 0d;
+				double maxAbsAngVelZ = 0d;
+				
+				// for each simulation for a given controller
+				for (SimulationController s : simulations.get(controller)) {
+					if (s.ran()) {
+						ran++;
+					} else {
+						notRan ++;
+					}
+					
+					final double[] initialConditionEulerAnglesV = s.getEulerAnglesOfInitialCondition().toArray();
+					final double[] initialConditionAngularVelocity = s.getAngularVelocityOfInitialCondition().toArray();
+
+					if (maxAbsEulerAngleX < FastMath.abs(initialConditionEulerAnglesV[0])) {
+						maxAbsEulerAngleX = FastMath.abs(initialConditionEulerAnglesV[0]);
+					}
+					if (maxAbsEulerAngleY < FastMath.abs(initialConditionEulerAnglesV[1])) {
+						maxAbsEulerAngleY = FastMath.abs(initialConditionEulerAnglesV[1]);
+					}
+					if (maxAbsEulerAngleZ < FastMath.abs(initialConditionEulerAnglesV[2])) {
+						maxAbsEulerAngleZ = FastMath.abs(initialConditionEulerAnglesV[2]);
+					}
+					if (maxAbsAngVelX < FastMath.abs(initialConditionAngularVelocity[0])) {
+						maxAbsAngVelX = FastMath.abs(initialConditionAngularVelocity[0]);
+					}
+					if (maxAbsAngVelY < FastMath.abs(initialConditionAngularVelocity[1])) {
+						maxAbsAngVelY = FastMath.abs(initialConditionAngularVelocity[1]);
+					}
+					if (maxAbsAngVelZ < FastMath.abs(initialConditionAngularVelocity[2])) {
+						maxAbsAngVelZ = FastMath.abs(initialConditionAngularVelocity[2]);
+					}
+				}
+				
+				logger.info("DOMAIN OF ATTRACTION - {} - Controller {} - Samples: {}, Ran: {}, Saved (not ran): {}, Max Euler Angles (XYZ): {},{},{}, Max Angular Velocities (XYZ): {},{},{} ",
 						label,
 						controller, 
-						simulations.get(controller).size());
+						simulations.get(controller).size(),
+						ran,
+						notRan,
+						maxAbsEulerAngleX,
+						maxAbsEulerAngleY,
+						maxAbsEulerAngleZ,
+						maxAbsAngVelX,
+						maxAbsAngVelY,
+						maxAbsAngVelZ);
 			}
 		}
 		
