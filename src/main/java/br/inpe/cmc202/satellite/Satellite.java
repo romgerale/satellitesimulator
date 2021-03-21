@@ -114,6 +114,11 @@ public class Satellite {
 	private double alpha1 = 0d;
 
 	/**
+	 *  To store the controllerName.
+	 */
+	final private String reactionWheelControllerName;
+	
+	/**
 	 * Constructor.
 	 * 
 	 * @param ecef
@@ -267,6 +272,7 @@ public class Satellite {
 		// ********************
 
 		// controller
+		this.reactionWheelControllerName = reactionWheelControllerName;
 		switch (reactionWheelControllerName) {
 		case "ProportionalDerivativeLinearSunVectorController":
 			this.controller = new ProportionalDerivativeLinearSunVectorController();
@@ -662,4 +668,10 @@ public class Satellite {
 		this.modeUsingAttitude = mode;
 	}
 	
+	/**
+	 * Returns the controller name in the satellite.
+	 */
+	public String getReactionWheelControllerName() {
+		return this.reactionWheelControllerName;
+	}
 }
