@@ -394,7 +394,8 @@ public class MultiSimulationController implements Runnable {
 			
 		boolean someSimulationConvexity = false;
 
-		// ENFORCING convexity for norm (consequently, conservative results)
+		// ENFORCING convexity for norm FOR NON CONVERGENT (consequently, conservative results)
+		// NOTE BETWEEN CONVERGENT RESULTS CAN EMERGE NONCONVEXITY
 		// iterating over not converged 
 		// for each controller
 		boolean done = false;
@@ -627,7 +628,34 @@ public class MultiSimulationController implements Runnable {
 					for (double i : domainOfAttractionNorm.get(controller).keySet()) {
 						data.put(domainOfAttractionNorm.get(controller).get(i)[0], domainOfAttractionNorm.get(controller).get(i)[1]);
 					}
-					domainOfAttractionNormShape.put(controller, data);
+					
+					// filtering results
+					Map<Double, Double> filteredData = new TreeMap<Double, Double>();
+					final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
+					final int numberOfIntervals = x.length > 100 ? 100 : x.length;
+					final double start = x[0];
+					final double end = x[x.length-1];
+					final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
+					int j = 0;
+					for (int k = 0; k < x.length; ) {
+						final double startInterval = start + lengthIntervalToAggregate * j;
+						final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
+						final double initialX = x[k];
+						double currentX = initialX;
+						double maxY = 0d;
+						while (currentX <= endInterval) {
+							if (data.get(currentX) > maxY) {
+								maxY = data.get(currentX);
+							}
+							k++;
+							if (k > x.length - 1) break;
+							currentX = x[k];
+						}
+						j++;
+						if (maxY > 0 ) filteredData.put(initialX, maxY);
+					}
+					
+					domainOfAttractionNormShape.put(controller, filteredData);
 				}
 
 			}
