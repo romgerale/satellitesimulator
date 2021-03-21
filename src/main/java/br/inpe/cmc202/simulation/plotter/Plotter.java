@@ -472,7 +472,9 @@ public class Plotter {
 			plot.addLegend("SOUTH");
 		}
 		for (String valueLabel : allValues.keySet()) {
-			plot.addLinePlot(valueLabel, allValues.get(valueLabel));
+			if (allValues.get(valueLabel).length > 0) {
+				plot.addLinePlot(valueLabel, allValues.get(valueLabel));
+			}
 		}
 
 		// Panel a = new Panel();
