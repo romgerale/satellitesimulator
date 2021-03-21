@@ -81,7 +81,7 @@ public class MultiSimulationController implements Runnable {
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
 					"ProportionalNonLinearQuaternionSDREController_GIBBS"));//,
 					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
-					//"ProportionalNonLinearMRPSDREController_FIRST",
+					//"ProportionalNonLinearMRPSDREController_FIRST"));
 					//"ProportionalNonLinearMRPSDREHInfinityController"));
 					//"NopeController"));
 
@@ -129,8 +129,8 @@ public class MultiSimulationController implements Runnable {
 
 			for (final String controller : CONTROLLERS) {
 				
-				final SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
-						initialAngularVelocity);
+				final SimulationController s = createSimulationController(initialAttitudeEulerAngles,
+						initialAngularVelocity, controller);
 				
 				// to check convergence and to clean the list of simulations
 				class SimulationControllerRunnable implements Runnable {
@@ -212,6 +212,16 @@ public class MultiSimulationController implements Runnable {
 		}
 		logger.info("{} simulations configured!", listSimulations.size());
 		logger.info("----------------------------");
+	}
+
+	/**
+	 * Create a controller.
+	 * 
+	 */
+	protected SimulationController createSimulationController(final double[] initialAttitudeEulerAngles,
+			final double[] initialAngularVelocity, final String controller) throws OrekitException {
+		return new SimulationController(controller, initialAttitudeEulerAngles,
+			initialAngularVelocity);
 	}
 
 	/*
@@ -307,13 +317,13 @@ public class MultiSimulationController implements Runnable {
 			logger.info(details);
 			Plotter.plot2DLine(quaternionError, key, "quaternion error", details);
 			Plotter.plot2DLine(angularVelocity, key, "angular velocity", details);
-			Plotter.plot2DLine(detControllability, key + " detControllability");
+			Plotter.plot2DLine(detControllability, key + " detControllability", false);
 			Plotter.plot2DLine(reactionWheelAngularVelocity, key, " reaction wheel angular velocity", details);
-			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + " reactionWheelAngularMomentum");
+			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + " reactionWheelAngularMomentum", false);
 
 			// STATE SPACE
-			Plotter.plot3DScatterStateSpace(vetQuaternionError, key + " state space quaternion - BODY");
-			Plotter.plot3DScatterStateSpace(vetAngularVelocity, key + " state space velocity - BODY");
+			Plotter.plot3DScatterStateSpace(vetQuaternionError, key + " state space quaternion - BODY", false);
+			Plotter.plot3DScatterStateSpace(vetAngularVelocity, key + " state space velocity - BODY", false);
 
 			// H-INFINITY
 			Plotter.plot2DLine(gama, key + " gama");
@@ -382,8 +392,9 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
 			
-		
-		// checking convexity for norm
+		boolean someSimulationConvexity = false;
+
+		// ENFORCING convexity for norm (consequently, conservative results)
 		// iterating over not converged 
 		// for each controller
 		boolean done = false;
@@ -429,6 +440,7 @@ public class MultiSimulationController implements Runnable {
 								// removing from converged
 								l.remove(s2check);
 								done = false;
+								someSimulationConvexity = true;
 								break main; // start again
 							}
 						} else {
@@ -442,42 +454,24 @@ public class MultiSimulationController implements Runnable {
 		
 		boolean someValueComputed = false;
 		
-		//final Map<String, Map<Double, Double>> angularVelocityStd = new TreeMap<String, Map<Double, Double>>();
-		//final Map<String, Map<Double, Double>> vectorialQuaternionErrorStd = new TreeMap<String, Map<Double, Double>>();
-		final Map<String, Map<Double, Double>> stateSpaceStd = new TreeMap<String, Map<Double, Double>>();
+		final Map<String, Map<Double, double[]>> stateSpaceStats = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, double[]>> reactionWheelStats = new TreeMap<String, Map<Double, double[]>>();
 
 		// for each controller
 		for (String controller : mapSimulations.keySet()) {
 			double i = 0d;
-			//final Map<Double, Double> valuesAng = new TreeMap<Double, Double>();
-			//final Map<Double, Double> valuesQuat = new TreeMap<Double, Double>();
-			final Map<Double, Double> valuesStateSpace = new TreeMap<Double, Double>();
+			stateSpaceStats.put(controller, new TreeMap<Double, double[]>());
+			reactionWheelStats.put(controller, new TreeMap<Double, double[]>());
 
 			// for each simulation for a given controller
 			for (SimulationController s : mapSimulations.get(controller)) {
-				//final DescriptiveStatistics normVectorialQuaternionError = new DescriptiveStatistics();
-				//final DescriptiveStatistics normAngularVelocity = new DescriptiveStatistics();
-				final DescriptiveStatistics normStateSpace = new DescriptiveStatistics();
+				final DescriptiveStatistics statStateSpace = new DescriptiveStatistics();
+				final DescriptiveStatistics statReactionWheel = new DescriptiveStatistics();
 				
 				for (Double t : s.stepHandler.quaternionError.keySet()) {
-					// calculate statistics of the norm of vectorial part of quaternion 
 					final double[] quartenionError = s.stepHandler.quaternionError.get(t);
-					final RealVector quaternion = new ArrayRealVector(new double[] { 
-							quartenionError[0],
-							quartenionError[1],
-							quartenionError[2], 
-							1-FastMath.abs(quartenionError[3])}); // adjusting to origin 0
-					logger.debug("Norm of Vectorial Part of Quaternion Error {} {}",controller, quaternion.getNorm());
-					//normVectorialQuaternionError.addValue(quaternion.getNorm());
-
-					// calculate statistics of the norm of angular velocity
 					final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
-					final RealVector angularVelocity = new ArrayRealVector(new double[] { 
-							angularVelocityError[0],
-							angularVelocityError[1],
-							angularVelocityError[2]});
-					logger.debug("Norm of Angular Velocity {} {}",controller, angularVelocity.getNorm());
-					//normAngularVelocity.addValue(angularVelocity.getNorm());
+					final double reactionWheelAngularMomentum = s.stepHandler.reactionWheelNormAngularMomentum.get(t);
 					
 					// calculate statistics of the norm of state space: 
 					// quaternion (last entry as scalar and adjusted to origin) 
@@ -490,39 +484,38 @@ public class MultiSimulationController implements Runnable {
 							angularVelocityError[0],
 							angularVelocityError[1],
 							angularVelocityError[2]});
-					logger.info("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
-					normStateSpace.addValue(stateSpace.getNorm());
+					logger.debug("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
+					statStateSpace.addValue(stateSpace.getNorm());
+					
+					statReactionWheel.addValue(reactionWheelAngularMomentum);
 					
 					someValueComputed = true;
 				}
 												
-				//valuesQuat.put(++i, normVectorialQuaternionError.getStandardDeviation());
-				//valuesAng.put(i, normAngularVelocity.getStandardDeviation());
-				valuesStateSpace.put(i, normStateSpace.getStandardDeviation());
+				stateSpaceStats.get(controller).put(++i, new double[] {
+						statStateSpace.getMean(),
+						statStateSpace.getStandardDeviation()});
 
+				reactionWheelStats.get(controller).put(++i, new double[] {
+						statReactionWheel.getMean(),
+						statReactionWheel.getStandardDeviation()});
 			}
 
-			//angularVelocityStd.put(controller, valuesAng);
-			//vectorialQuaternionErrorStd.put(controller, valuesQuat);
-			stateSpaceStd.put(controller,  valuesStateSpace);
 		}
 
-		//logger.info(angularVelocityStd.entrySet().toString());
-		//logger.info(vectorialQuaternionErrorStd.entrySet().toString());
-		logger.info(stateSpaceStd.entrySet().toString());
-		
 		if (someValueComputed) {
-			//Plotter.plot2DLine(vectorialQuaternionErrorStd, "Statistics of L2 Norm of Quaternion Error");
-			//Plotter.plot2DLine(angularVelocityStd, "Statistics of L2 Norm of Angular Velocity");
-			Plotter.plot2DLine(stateSpaceStd, "Statistics of L2 Norm of State Space");
+			Plotter.plot2DScatter(stateSpaceStats, "Statistics of L2 Norm of State Space - CONVERGED",
+					new String[] {"mean of Norm", "standard deviation of Norm"});
+			Plotter.plot2DScatter(reactionWheelStats, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED",
+					new String[] {"mean of Norm", "standard deviation of Norm"});
 		}
-		logger.info("Results computed {}!", someValueComputed);
+		logger.info("Results computed {} and convexity enforced {}!", someValueComputed, someSimulationConvexity);
 		logger.info("----------------------------");
 	}
 	
 	
 	/**
-	 * For calculating statistics.
+	 * For plotting the domain of attraction.
 	 * 
 	 */
 	protected void plotDomainOfAttraction(Map<String, List<SimulationController>> simulations, String label) {
@@ -535,7 +528,7 @@ public class MultiSimulationController implements Runnable {
 		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
 		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
 
-		// CONVERGED - for each controller
+		// for each controller
 		for (String controller : simulations.keySet()) {
 			double i = 0d;
 
@@ -571,9 +564,8 @@ public class MultiSimulationController implements Runnable {
 		}
 
 		if (hasSomeDomainOfAttraction) {
-			Plotter.plot2DScatterInitialConditions(domainOfAttractionNorm, "Domain of Attraction - Norm " + label);
-			Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
-			Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
+			// logging the results and trying to compute a convex domain of attraction 
+			final Map<String, Map<Double, Double>> domainOfAttractionNormShape = new TreeMap<String, Map<Double, Double>>();
 			for (String controller : simulations.keySet()) {
 				
 				int ran = 0;
@@ -628,7 +620,25 @@ public class MultiSimulationController implements Runnable {
 						maxAbsAngVelX,
 						maxAbsAngVelY,
 						maxAbsAngVelZ);
+				
+				// trying to figure out the shape of the domain of attraction
+				if ("CONVERGED".equals(label)) {
+					Map<Double, Double> data = new TreeMap<Double, Double>();
+					for (double i : domainOfAttractionNorm.get(controller).keySet()) {
+						data.put(domainOfAttractionNorm.get(controller).get(i)[0], domainOfAttractionNorm.get(controller).get(i)[1]);
+					}
+					domainOfAttractionNormShape.put(controller, data);
+				}
+
 			}
+			
+			// plotting
+			Plotter.plot2DScatter(domainOfAttractionNorm, "Domain of Attraction - Norm " + label,
+					new String[] {"norm of Euler Angles", "norm of angular velocity"});
+			Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
+			Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
+			Plotter.plot2DLine(domainOfAttractionNormShape, "Domain of Attraction - Norm - Shape " + label,
+					true);
 		}
 		
 		logger.info("Domain of Attraction ({}) plotted {}!", label, hasSomeDomainOfAttraction);
@@ -711,7 +721,7 @@ public class MultiSimulationController implements Runnable {
 				if (approach == 0 ) {
 					// NORMAL
 					initialAttitudeEulerAngles[0] = gaussianAnglesX.nextNormal(MEAN_ANGLE, STD_ANGLE);
-					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextNormal(MEAN_ANGLE, STD_ANGLE);
+					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextNormal(MEAN_ANGLE/2d, STD_ANGLE/2d); // intermediary axis has a "smaller range
 					initialAttitudeEulerAngles[2] = gaussianAnglesZ.nextNormal(MEAN_ANGLE, STD_ANGLE);
 							
 					initialAngularVelocity[0] = gaussianVelocityX.nextNormal(MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY);
@@ -721,7 +731,7 @@ public class MultiSimulationController implements Runnable {
 				} else {
 					// UNIFORM
 					initialAttitudeEulerAngles[0] = gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
-					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
+					initialAttitudeEulerAngles[1] = gaussianAnglesY.nextUniform(LOWER_ANGLE/2d, UPPER_ANGLE/2d); // intermediary axis has a "smaller range
 					initialAttitudeEulerAngles[2] = gaussianAnglesZ.nextUniform(LOWER_ANGLE, UPPER_ANGLE);
 							
 					initialAngularVelocity[0] = gaussianVelocityX.nextUniform(LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY);
@@ -898,7 +908,8 @@ public class MultiSimulationController implements Runnable {
 		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") Euler Angles");
 		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
 		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
-		Plotter.plot2DScatterInitialConditions(initialNorm, "Initial Conditions - Norm");
+		Plotter.plot2DScatter(initialNorm, "Initial Conditions - Norm",
+				new String[] {"norm of Euler Angles", "norm of angular velocity"});
 
 		logger.info("{} initial conditions computed!", initialAngles.get("initialAngles").size());
 		logger.info("----------------------------");
