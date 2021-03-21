@@ -548,13 +548,13 @@ public class SimulationController implements Runnable {
 	protected boolean checkConvergence() {
 		boolean convergenceStateSpace = true;
 
-		if (this.stepHandler.currentTime * this.step < this.simulationTime ) {
+		if (!ran()) {
 			throw new RuntimeException("Check convergence must be only called at the final of the simulation!");
 		}
 		
 		// getting last 5% of time TO TEST CONVERGENCE
 		final double tToTestConvergence = this.stepHandler.lastStoredTime - (this.stepHandler.lastStoredTime * .05d);
-		logger.info("time to test convergence {}",tToTestConvergence);
+		logger.debug("time to test convergence {}",tToTestConvergence);
 		
 		// filtering times to evaluate
 		final Set<Double> timesToEvaluate = new TreeSet<Double>(this.stepHandler.quaternionError.keySet());
@@ -580,7 +580,7 @@ public class SimulationController implements Runnable {
 			}
 		}
 
-		logger.info("convergence {} epsilon {}", convergenceStateSpace, epsilon);
+		logger.debug("convergence {} epsilon {}", convergenceStateSpace, epsilon);
 
 		return convergenceStateSpace;
 	}
@@ -604,6 +604,13 @@ public class SimulationController implements Runnable {
 				FastMath.toDegrees(initialAnglesRadians[2])};
 		final RealVector initialConditionEulerAnglesV = new ArrayRealVector(initialConditionEulerAngles);
 		return initialConditionEulerAnglesV;
+	}
+	
+	/**
+	 * Returns whether the simulation ran.
+	 */
+	protected boolean ran() {
+		return this.stepHandler.currentTime * this.step >= this.simulationTime ;
 	}
 	
 	/**
