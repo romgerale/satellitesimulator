@@ -29,8 +29,9 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * 
  * AMAZONIA1
  * 
- * @author alessandro.g.romero
  * 
+ * @author alessandro.g.romero
+ * @deprecated see MultiSimulationUncertaintyController
  */
 public class MultiSimulationParametricUncertaintyPlusController extends MultiSimulationController {
 

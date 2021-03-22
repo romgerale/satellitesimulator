@@ -24,7 +24,7 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * CUBESAT - CONASAT
  * 
  * @author alessandro.g.romero
- * 
+ * @deprecated see MultiSimulationUncertaintyController
  */
 public class MultiSimulationParametricUncertaintyController extends MultiSimulationController {
 
