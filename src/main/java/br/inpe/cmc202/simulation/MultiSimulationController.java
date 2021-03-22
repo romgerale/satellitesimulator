@@ -232,9 +232,9 @@ public class MultiSimulationController implements Runnable {
 	public void run() {
 		runSimulations();
 		
-		computeResults();
+		computeResults(mapSimulations, mapSimulationsNotConverged);
 
-		plotSimulations();
+		plotSimulations(mapSimulations);
 		
 		plotDomainOfAttraction(mapSimulations, "CONVERGED");
 		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED");
@@ -272,7 +272,7 @@ public class MultiSimulationController implements Runnable {
 	 * For plotting simulations.
 	 * 
 	 */
-	protected void plotSimulations() {
+	protected void plotSimulations(Map<String, List<SimulationController>> mapSimulations) {
 		logger.info("----------------------------");
 		logger.info("Plotting results...");
 		
@@ -388,7 +388,7 @@ public class MultiSimulationController implements Runnable {
 	 * For calculating statistics.
 	 * 
 	 */
-	protected void computeResults() {
+	protected void computeResults(Map<String, List<SimulationController>> mapSimulations, Map<String, List<SimulationController>> mapSimulationsNotConverged) {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
 			
