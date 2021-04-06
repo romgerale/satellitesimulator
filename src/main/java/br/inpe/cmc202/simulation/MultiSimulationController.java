@@ -132,81 +132,9 @@ public class MultiSimulationController implements Runnable {
 				final SimulationController s = createSimulationController(initialAttitudeEulerAngles,
 						initialAngularVelocity, controller);
 				
-				// to check convergence and to clean the list of simulations
-				class SimulationControllerRunnable implements Runnable {
-					SimulationController storedSimulationController;
-					{
-						this.storedSimulationController = s;
-					}
-					
-					@Override
-					public void run() {
-						// running
-						storedSimulationController.run();
-						
-						// checking convergence
-						final boolean convergence = storedSimulationController.checkConvergence();
-						final String controllerName =  storedSimulationController.satellite.getReactionWheelControllerName();
-						if (!convergence) {
-							// adding to not converged
-							List<SimulationController> lnc = mapSimulationsNotConverged.get(controllerName);
-							if (lnc == null) {
-								lnc = new ArrayList<SimulationController>();
-								mapSimulationsNotConverged.put(controllerName, lnc);
-							}
-							lnc.add(storedSimulationController);
-							// removing from converged
-							List<SimulationController> l = mapSimulations.get(controllerName);
-							if (l == null) {
-								l = new ArrayList<SimulationController>();
-								mapSimulations.put(controllerName, l);
-							}
-							//l.remove(storedSimulationController);
-							
-							// searching in the next simulations - IN THE QUEUE
-							final double normEulerAngles = storedSimulationController.getEulerAnglesOfInitialCondition().getNorm();
-							final double normAngVelocity = storedSimulationController.getAngularVelocityOfInitialCondition().getNorm();
-							for (Runnable toRun : executorPool.getQueue()) {
-								SimulationController toRunS = ((SimulationControllerRunnable) toRun).storedSimulationController;
-								final String controllerNameToRun = toRunS.satellite.getReactionWheelControllerName();
-								final double normEulerAnglesToRun = toRunS.getEulerAnglesOfInitialCondition().getNorm();
-								final double normAngVelocityToRun = toRunS.getAngularVelocityOfInitialCondition().getNorm();
-								if (controllerNameToRun.equals(controllerName) &&
-										normEulerAnglesToRun > normEulerAngles 
-										&& normAngVelocityToRun > normAngVelocity) {
-									logger.info("Found a simulation that should NOT RUN: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
-											controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
-									// remove from EXECUTOR
-									logger.info("Removing from executor, success: {}!", executorPool.remove(toRun));
-									// adding to not converged
-									lnc.add(toRunS);
-									// removing from converged
-									//l.remove(toRunS);
-								}
-							}
-							
-						} else {
-							// adding to converged
-							List<SimulationController> l = mapSimulations.get(controllerName);
-							if (l == null) {
-								l = new ArrayList<SimulationController>();
-								mapSimulations.put(controllerName, l);
-							}
-							l.add(storedSimulationController);
-						}
-					}
-					
-				};
-
-				Runnable s2 = new SimulationControllerRunnable();
+				Runnable s2 = new SimulationControllerRunnable(s, mapSimulations, mapSimulationsNotConverged);
 						
 				listSimulations.add(s2);
-				//List<SimulationController> l = mapSimulations.get(controller);
-				//if (l == null) {
-				//	l = new ArrayList<SimulationController>();
-				//	mapSimulations.put(controller, l);
-				//}
-				//l.add(s);
 			}
 
 		}
@@ -392,10 +320,10 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
 			
-		boolean someSimulationConvexity = false;
+		boolean someSimulationPolygon = false;
 
-		// ENFORCING convexity for norm FOR NON CONVERGENT (consequently, conservative results)
-		// NOTE BETWEEN CONVERGENT RESULTS CAN EMERGE NONCONVEXITY
+		// ENFORCING polygon for norm FOR NON CONVERGENT (consequently, conservative results)
+		// NOTE BETWEEN CONVERGENT RESULTS CAN EMERGE "HOLES
 		// iterating over not converged 
 		// for each controller
 		boolean done = false;
@@ -423,7 +351,7 @@ public class MultiSimulationController implements Runnable {
 					final double normEulerAngles = s.getEulerAnglesOfInitialCondition().getNorm();
 					final double normAngVelocity = s.getAngularVelocityOfInitialCondition().getNorm();
 	
-					// searching in convergent to move to NOT CONVERGED if it does not satisfy the condition (convexity)
+					// searching in convergent to move to NOT CONVERGED if it does not satisfy the condition (polygon)
 					List<SimulationController> l2check = new ArrayList<SimulationController>(l);
 					for (SimulationController s2check : l2check) {
 						// it ran
@@ -434,14 +362,14 @@ public class MultiSimulationController implements Runnable {
 							if (controllerNameToRun.equals(controller) &&
 									normEulerAnglesToRun > normEulerAngles 
 									&& normAngVelocityToRun > normAngVelocity) {
-								logger.info("Found a simulation that is CONVERGENT but it does not satisfy CONVEXITY for NORM: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
+								logger.info("Found a simulation that is CONVERGENT but it does not satisfy POLYGON for NORM: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
 										controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
 								// adding to not converged
 								lnc.add(s2check);
 								// removing from converged
 								l.remove(s2check);
 								done = false;
-								someSimulationConvexity = true;
+								someSimulationPolygon = true;
 								break main; // start again
 							}
 						} else {
@@ -510,7 +438,7 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot2DScatter(reactionWheelStats, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED",
 					new String[] {"mean of Norm", "standard deviation of Norm"});
 		}
-		logger.info("Results computed {} and convexity enforced {}!", someValueComputed, someSimulationConvexity);
+		logger.info("Results computed {} and polygon enforced {}!", someValueComputed, someSimulationPolygon);
 		logger.info("----------------------------");
 	}
 	
@@ -565,7 +493,7 @@ public class MultiSimulationController implements Runnable {
 		}
 
 		if (hasSomeDomainOfAttraction) {
-			// logging the results and trying to compute a convex domain of attraction 
+			// logging the results and trying to compute a polygon for the domain of attraction 
 			final Map<String, Map<Double, Double>> domainOfAttractionNormShape = new TreeMap<String, Map<Double, Double>>();
 			for (String controller : simulations.keySet()) {
 				
@@ -950,5 +878,71 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 				
 	}
+
+	//**********
+	
+	// to check convergence and to clean the list of simulations
+	class SimulationControllerRunnable implements Runnable {
+		private final SimulationController storedSimulationController;
+		private final Map<String, List<SimulationController>> storedMapSimulations;
+		private final Map<String, List<SimulationController>> storedMapSimulationsNotConverged;
+		
+		SimulationControllerRunnable(final SimulationController s,
+				final Map<String, List<SimulationController>> mapSimulationsP,
+				final Map<String, List<SimulationController>> mapSimulationsNotConvergedP){
+			this.storedSimulationController = s;
+			this.storedMapSimulations = mapSimulationsP;
+			this.storedMapSimulationsNotConverged = mapSimulationsNotConvergedP;
+		}
+		
+		@Override
+		public void run() {
+			// running
+			storedSimulationController.run();
+			
+			// checking convergence
+			final boolean convergence = storedSimulationController.checkConvergence();
+			final String controllerName =  storedSimulationController.satellite.getReactionWheelControllerName();
+			if (!convergence) {
+				// adding to not converged
+				List<SimulationController> lnc = storedMapSimulationsNotConverged.get(controllerName);
+				if (lnc == null) {
+					lnc = new ArrayList<SimulationController>();
+					storedMapSimulationsNotConverged.put(controllerName, lnc);
+				}
+				lnc.add(storedSimulationController);
+				
+				// searching in the next simulations - IN THE QUEUE
+				final double normEulerAngles = storedSimulationController.getEulerAnglesOfInitialCondition().getNorm();
+				final double normAngVelocity = storedSimulationController.getAngularVelocityOfInitialCondition().getNorm();
+				for (Runnable toRun : executorPool.getQueue()) {
+					SimulationController toRunS = ((SimulationControllerRunnable) toRun).storedSimulationController;
+					final String controllerNameToRun = toRunS.satellite.getReactionWheelControllerName();
+					final double normEulerAnglesToRun = toRunS.getEulerAnglesOfInitialCondition().getNorm();
+					final double normAngVelocityToRun = toRunS.getAngularVelocityOfInitialCondition().getNorm();
+					if (controllerNameToRun.equals(controllerName) &&
+							normEulerAnglesToRun > normEulerAngles 
+							&& normAngVelocityToRun > normAngVelocity) {
+						logger.info("Found a simulation that should NOT RUN: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
+								controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
+						// remove from EXECUTOR
+						logger.info("Removing from executor, success: {}!", executorPool.remove(toRun));
+						// adding to not converged
+						lnc.add(toRunS);
+					}
+				}
+				
+			} else {
+				// adding to converged
+				List<SimulationController> l = storedMapSimulations.get(controllerName);
+				if (l == null) {
+					l = new ArrayList<SimulationController>();
+					storedMapSimulations.put(controllerName, l);
+				}
+				l.add(storedSimulationController);
+			}
+		}
+		
+	};
 
 }
