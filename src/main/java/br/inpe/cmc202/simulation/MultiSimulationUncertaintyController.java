@@ -27,12 +27,12 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+					"ProportionalNonLinearQuaternionSDREController_GIBBS"));
+					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 	
-	final double LOWER_DEVIATION = -1E-2d; 
-	final double UPPER_DEVIATION = 1E-2d;  
-	final int NUMBER_OF_DEVIATIONS = 1;  
+	final double LOWER_DEVIATION = -3E-1d; 
+	final double UPPER_DEVIATION = 3E-1d;  
+	final int NUMBER_OF_DEVIATIONS = 2;  
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
@@ -72,7 +72,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 					final SimulationController s = new SimulationController(controller, calculateInertiaTensor(p), initialAttitudeEulerAngles,
 							initialAngularVelocity);
 					
-					Runnable s2 = new SimulationControllerRunnable(s, mapSimulationsUP, mapSimulationsNotConvergedUP);
+					final Runnable s2 = new SimulationControllerRunnable(s, mapSimulationsUP, mapSimulationsNotConvergedUP);
 							
 					listSimulations.add(s2);
 				}
