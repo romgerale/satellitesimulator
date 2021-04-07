@@ -20,7 +20,7 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * with different alphas defined for a given Monte Carlo perturbation model.
  * 
  * @author alessandro.g.romero
- * 
+ * @deprecated
  */
 public class MultiAlphaSimulationController extends MultiSimulationController {
 

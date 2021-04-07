@@ -1,7 +1,13 @@
 package br.inpe.cmc202.simulation;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
+import org.math.plot.utils.FastMath;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,18 +24,91 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	
 	static final private Logger logger = LoggerFactory
 			.getLogger(MultiSimulationUncertaintyController.class);
+	
+	private static final List<String> CONTROLLERS = new ArrayList<String>(
+			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
+					"ProportionalNonLinearQuaternionSDREController_GIBBS",
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+	
+	final double LOWER_DEVIATION = -1E-2d; 
+	final double UPPER_DEVIATION = 1E-2d;  
+	final int NUMBER_OF_DEVIATIONS = 1;  
 
-	public MultiSimulationUncertaintyController(int numberOfSimulations, int approach) throws OrekitException {
-		super(numberOfSimulations, approach);
+	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
+	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
+
+	public MultiSimulationUncertaintyController(int numberOfSimulations, int approach, int perturbationType) throws OrekitException {
+		super();
+		logger.info("----------------------------");
+		logger.info("Configuring multi simulation... number of simulations: {}", numberOfSimulations);
+
+		computeInitialConditions(numberOfSimulations, approach);
+		// getting the computed initial conditions
+		final Map<Double, double[]> initialAnglesComputed = initialAngles.get("initialAngles");
+		final Map<Double, double[]> initialAngularVelocitiesComputed = initialAngularVelocities.get("initialAngularVelocities");
+
+		//computing perturbation
+		double stepPerturbation = (FastMath.abs(LOWER_DEVIATION)+FastMath.abs(UPPER_DEVIATION)) / (double) NUMBER_OF_DEVIATIONS;
+		logger.info("Configuring perturbation... lower: {} upper: {} step: {}", LOWER_DEVIATION, UPPER_DEVIATION, stepPerturbation);
+		
+		// PERTURBATION
+		for(double p = LOWER_DEVIATION; p <= UPPER_DEVIATION; p+=stepPerturbation) {			
+			final Map<String, List<SimulationController>> mapSimulationsUP = new HashMap<String, List<SimulationController>>();
+			final Map<String, List<SimulationController>> mapSimulationsNotConvergedUP = new HashMap<String, List<SimulationController>>();
+			
+			mapSimulationsU.put(p, mapSimulationsUP);
+			mapSimulationsNotConvergedU.put(p,  mapSimulationsNotConvergedUP);
+
+			// INITIAL CONDITIONS
+			for (int i = 1; i <= initialAnglesComputed.size(); i++) {
+	
+				final double[] initialAttitudeEulerAngles = initialAnglesComputed.get((double)i);
+	
+				final double[] initialAngularVelocity = initialAngularVelocitiesComputed.get((double)i);
+	
+				// CONTROLLERS
+				for (final String controller : CONTROLLERS) {
+					
+					final SimulationController s = new SimulationController(controller, calculateInertiaTensor(p), initialAttitudeEulerAngles,
+							initialAngularVelocity);
+					
+					Runnable s2 = new SimulationControllerRunnable(s, mapSimulationsUP, mapSimulationsNotConvergedUP);
+							
+					listSimulations.add(s2);
+				}
+	
+			}
+		}
+		logger.info("{} simulations configured!", listSimulations.size());
+		logger.info("----------------------------");
 	}
 
-	@Override
-	protected SimulationController createSimulationController(final double[] initialAttitudeEulerAngles,
-			final double[] initialAngularVelocity, final String controller) throws OrekitException {
-		return new SimulationController(controller, calculateInertiaTensor(2E-1d), initialAttitudeEulerAngles,
-			initialAngularVelocity);
-	}
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see java.lang.Runnable#run()
+	 */
+	public void run() {
+		runSimulations();
+		
+		for (Double p: mapSimulationsU.keySet()) {
+			final Map<String, List<SimulationController>> mapSimulationsUP = mapSimulationsU.get(p);
+			final Map<String, List<SimulationController>> mapSimulationsNotConvergedUP = mapSimulationsNotConvergedU.get(p);
 
+			logger.info("Computing PERTURBATION {}, CONVERGED {} NOT CONVERGED {}...", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
+			computeResults(mapSimulationsUP, mapSimulationsNotConvergedUP, false);
+			logger.info("Computed PERTURBATION {}, CONVERGED {} NOT CONVERGED {}!", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
+			
+			plotDomainOfAttraction(mapSimulationsUP, "CONVERGED "+p, false);
+			plotDomainOfAttraction(mapSimulationsNotConvergedUP, "NOT CONVERGED "+p, false);
+			
+			// to check
+			plotSimulations(mapSimulationsNotConvergedUP);
+
+		}
+		
+	}
+	
 	/**
 	 * Calculate the inertiaTensor - the parametric uncertainty.
 	 * 
@@ -86,16 +165,20 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 
 		int numberOfSimulations = 0;
 		int approach = 1;
+		int perturbationType = 0;
 		if (args.length > 0) {
 			numberOfSimulations = Integer.parseInt(args[0]);
 			if (args.length > 1) {
 				approach = Integer.parseInt(args[1]);
+				if (args.length > 2) {
+					perturbationType = Integer.parseInt(args[2]);
+				}
 			}
 		} else {
 			throw new RuntimeException("It must be informed the number of trials!");
 		}
 
-		new MultiSimulationUncertaintyController(numberOfSimulations, approach).run();
+		new MultiSimulationUncertaintyController(numberOfSimulations, approach, perturbationType).run();
 
 	}
 }

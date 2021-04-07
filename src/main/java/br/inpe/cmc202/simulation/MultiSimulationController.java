@@ -113,10 +113,10 @@ public class MultiSimulationController implements Runnable {
 	 * @throws OrekitException
 	 */
 	public MultiSimulationController(int numberOfSimulations, int approach) throws OrekitException {		
-		computeInitialConditions(numberOfSimulations, approach);
-		
 		logger.info("----------------------------");
 		logger.info("Configuring multi simulation... number of simulations: {}", numberOfSimulations);
+
+		computeInitialConditions(numberOfSimulations, approach);
 		// getting the computed initial conditions
 		final Map<Double, double[]> initialAnglesComputed = initialAngles.get("initialAngles");
 		final Map<Double, double[]> initialAngularVelocitiesComputed = initialAngularVelocities.get("initialAngularVelocities");
@@ -129,8 +129,8 @@ public class MultiSimulationController implements Runnable {
 
 			for (final String controller : CONTROLLERS) {
 				
-				final SimulationController s = createSimulationController(initialAttitudeEulerAngles,
-						initialAngularVelocity, controller);
+				final SimulationController s = new SimulationController(controller, initialAttitudeEulerAngles,
+						initialAngularVelocity);
 				
 				Runnable s2 = new SimulationControllerRunnable(s, mapSimulations, mapSimulationsNotConverged);
 						
@@ -142,16 +142,6 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 	}
 
-	/**
-	 * Create a controller.
-	 * 
-	 */
-	protected SimulationController createSimulationController(final double[] initialAttitudeEulerAngles,
-			final double[] initialAngularVelocity, final String controller) throws OrekitException {
-		return new SimulationController(controller, initialAttitudeEulerAngles,
-			initialAngularVelocity);
-	}
-
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -160,12 +150,12 @@ public class MultiSimulationController implements Runnable {
 	public void run() {
 		runSimulations();
 		
-		computeResults(mapSimulations, mapSimulationsNotConverged);
+		computeResults(mapSimulations, mapSimulationsNotConverged, true);
 
 		plotSimulations(mapSimulations);
 		
-		plotDomainOfAttraction(mapSimulations, "CONVERGED");
-		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED");
+		plotDomainOfAttraction(mapSimulations, "CONVERGED", true);
+		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED", true);
 	}
 
 	/**
@@ -316,7 +306,9 @@ public class MultiSimulationController implements Runnable {
 	 * For calculating statistics.
 	 * 
 	 */
-	protected void computeResults(Map<String, List<SimulationController>> mapSimulations, Map<String, List<SimulationController>> mapSimulationsNotConverged) {
+	protected void computeResults(Map<String, List<SimulationController>> mapSimulations, 
+			Map<String, List<SimulationController>> mapSimulationsNotConverged,
+			boolean plotStatistics) {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
 			
@@ -432,7 +424,7 @@ public class MultiSimulationController implements Runnable {
 
 		}
 
-		if (someValueComputed) {
+		if (someValueComputed && plotStatistics) {
 			Plotter.plot2DScatter(stateSpaceStats, "Statistics of L2 Norm of State Space - CONVERGED",
 					new String[] {"mean of Norm", "standard deviation of Norm"});
 			Plotter.plot2DScatter(reactionWheelStats, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED",
@@ -447,7 +439,9 @@ public class MultiSimulationController implements Runnable {
 	 * For plotting the domain of attraction.
 	 * 
 	 */
-	protected void plotDomainOfAttraction(Map<String, List<SimulationController>> simulations, String label) {
+	protected void plotDomainOfAttraction(Map<String, List<SimulationController>> simulations, 
+			String label, 
+			boolean plotAttitudeAndAngularVelocity) {
 		logger.info("----------------------------");
 		logger.info("Plotting Domain of Attraction ({})...", label);
 		
@@ -551,46 +545,49 @@ public class MultiSimulationController implements Runnable {
 						maxAbsAngVelZ);
 				
 				// trying to figure out the shape of the domain of attraction
-				if ("CONVERGED".equals(label)) {
+				if (label != null && label.startsWith("CONVERGED")) {
 					Map<Double, Double> data = new TreeMap<Double, Double>();
 					for (double i : domainOfAttractionNorm.get(controller).keySet()) {
 						data.put(domainOfAttractionNorm.get(controller).get(i)[0], domainOfAttractionNorm.get(controller).get(i)[1]);
 					}
-					
 					// filtering results
-					Map<Double, Double> filteredData = new TreeMap<Double, Double>();
-					final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
-					final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
-					final double start = x[0];
-					final double end = x[x.length-1];
-					final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
-					
-					// first point "FAKE" reusing y and x=0
-					filteredData.put(0d, data.get(start));
-					
-					int j = 0;
-					for (int k = 0; k < x.length; ) {
-						final double startInterval = start + lengthIntervalToAggregate * j;
-						final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
-						final double initialX = x[k];
-						double currentX = initialX;
-						double maxY = 0d;
-						while (currentX <= endInterval) {
-							if (data.get(currentX) > maxY) {
-								maxY = data.get(currentX);
+					if (data.size() > 0) {
+						Map<Double, Double> filteredData = new TreeMap<Double, Double>();
+						final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
+						final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
+						final double start = x[0];
+						final double end = x[x.length-1];
+						final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
+						
+						// first point "FAKE" reusing y and x=0
+						filteredData.put(0d, data.get(start));
+						
+						int j = 0;
+						for (int k = 0; k < x.length; ) {
+							final double startInterval = start + lengthIntervalToAggregate * j;
+							final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
+							final double initialX = x[k];
+							double currentX = initialX;
+							double maxY = 0d;
+							while (currentX <= endInterval) {
+								if (data.get(currentX) > maxY) {
+									maxY = data.get(currentX);
+								}
+								k++;
+								if (k > x.length - 1) break;
+								currentX = x[k];
 							}
-							k++;
-							if (k > x.length - 1) break;
-							currentX = x[k];
+							j++;
+							if (maxY > 0 ) filteredData.put(x[k-1], maxY);
 						}
-						j++;
-						if (maxY > 0 ) filteredData.put(x[k-1], maxY);
+	
+						// last point "FAKE" reusing x and y=0
+						filteredData.put(end+1E-10, 0d);
+	
+						domainOfAttractionNormShape.put(controller, filteredData);
+					} else {
+						logger.info("No data available for computing the shape of {}!", controller);
 					}
-
-					// last point "FAKE" reusing x and y=0
-					filteredData.put(end+1E-10, 0d);
-
-					domainOfAttractionNormShape.put(controller, filteredData);
 				}
 
 			}
@@ -598,8 +595,10 @@ public class MultiSimulationController implements Runnable {
 			// plotting
 			Plotter.plot2DScatter(domainOfAttractionNorm, "Domain of Attraction - Norm " + label,
 					new String[] {"norm of Euler Angles", "norm of angular velocity"});
-			Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
-			Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
+			if (plotAttitudeAndAngularVelocity) {
+				Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
+				Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
+			}
 			Plotter.plot2DLine(domainOfAttractionNormShape, "Domain of Attraction - Norm - Shape " + label,
 					true);
 		}
