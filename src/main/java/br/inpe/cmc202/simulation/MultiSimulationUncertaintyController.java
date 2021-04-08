@@ -32,7 +32,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	
 	final double LOWER_DEVIATION = -3E-1d; 
 	final double UPPER_DEVIATION = 3E-1d;  
-	final int NUMBER_OF_DEVIATIONS = 2;  
+	final int NUMBER_OF_DEVIATIONS = 10;  
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
@@ -49,7 +49,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 
 		//computing perturbation
 		double stepPerturbation = (FastMath.abs(LOWER_DEVIATION)+FastMath.abs(UPPER_DEVIATION)) / (double) NUMBER_OF_DEVIATIONS;
-		logger.info("Configuring perturbation... lower: {} upper: {} step: {}", LOWER_DEVIATION, UPPER_DEVIATION, stepPerturbation);
+		logger.info("Configuring perturbation (TYPE={}, 0 = Parametric(InertiaTensor), 1 = Unstructured(externalTorques))... lower: {} upper: {} step: {}", perturbationType, LOWER_DEVIATION, UPPER_DEVIATION, stepPerturbation);
 		
 		// PERTURBATION
 		for(double p = LOWER_DEVIATION; p <= UPPER_DEVIATION; p+=stepPerturbation) {			
@@ -69,8 +69,14 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 				// CONTROLLERS
 				for (final String controller : CONTROLLERS) {
 					
-					final SimulationController s = new SimulationController(controller, calculateInertiaTensor(p), initialAttitudeEulerAngles,
+					SimulationController s = null;
+					if (perturbationType == 0) {
+						s = new SimulationController(controller, calculateInertiaTensor(p), initialAttitudeEulerAngles,
 							initialAngularVelocity);
+					} else {
+						s = new SimulationController(controller, p, initialAttitudeEulerAngles,
+								initialAngularVelocity);
+					}
 					
 					final Runnable s2 = new SimulationControllerRunnable(s, mapSimulationsUP, mapSimulationsNotConvergedUP);
 							

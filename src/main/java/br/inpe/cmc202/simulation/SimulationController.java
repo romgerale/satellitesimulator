@@ -85,32 +85,7 @@ public class SimulationController implements Runnable {
 	 * @throws OrekitException
 	 */
 	public SimulationController() throws OrekitException {
-		logger.info("Loading configuration...");
-		try {
-			logger.info("Reading \"simulationcontroller.properties\"...");
-			InputStream in = ClassLoader.getSystemResourceAsStream("simulationcontroller.properties");
-			if (in == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration file \"simulationcontroller.properties\" not found"));
-			}
-			simulationConfiguration.load(in);
-			in.close();
-			final String configName = simulationConfiguration.getProperty("satellite.properties");
-			if (configName == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration \"satellite.properties\" is not defined"));
-			}
-			logger.info("Reading \"" + configName + ".properties\"...");
-			in = ClassLoader.getSystemResourceAsStream(configName + ".properties");
-			if (in == null) {
-				throw new OrekitException(new DummyLocalizable("Configuration file \"" + configName + "\" not found"));
-			}
-			satelliteConfiguration.load(in);
-			in.close();
-		} catch (IOException io) {
-			throw new OrekitException(new DummyLocalizable("problems loading simulationcontroller.properties"), io);
-		}
-		logger.info("Configuration loaded.");
+		loadDefaultConfiguration();
 
 		// setting initial attitude
 		this.initialAttitude = new double[] {
@@ -141,32 +116,7 @@ public class SimulationController implements Runnable {
 	 */
 	public SimulationController(String reactionWheelControllerName, double[] initialAttitude,
 			double[] initialAngularVelocity) throws OrekitException {
-		logger.info("Loading configuration...");
-		try {
-			logger.info("Reading \"simulationcontroller.properties\"...");
-			InputStream in = ClassLoader.getSystemResourceAsStream("simulationcontroller.properties");
-			if (in == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration file \"simulationcontroller.properties\" not found"));
-			}
-			simulationConfiguration.load(in);
-			in.close();
-			final String configName = simulationConfiguration.getProperty("satellite.properties");
-			if (configName == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration \"satellite.properties\" is not defined"));
-			}
-			logger.info("Reading \"" + configName + ".properties\"...");
-			in = ClassLoader.getSystemResourceAsStream(configName + ".properties");
-			if (in == null) {
-				throw new OrekitException(new DummyLocalizable("Configuration file \"" + configName + "\" not found"));
-			}
-			satelliteConfiguration.load(in);
-			in.close();
-		} catch (IOException io) {
-			throw new OrekitException(new DummyLocalizable("problems loading simulationcontroller.properties"), io);
-		}
-		logger.info("Configuration loaded.");
+		loadDefaultConfiguration();
 
 		// using initial attitude and angular velocity
 		this.initialAttitude = initialAttitude;
@@ -180,41 +130,15 @@ public class SimulationController implements Runnable {
 	}
 
 	/**
-	 * Constructor based on configuration files. It allows t ooverride the
-	 * controller defined in the files as well as initial attitude and initial
-	 * angular velocity.
+	 * Constructor based on configuration files. It allows to override the
+	 * controller defined in the files as well as the alpha.
 	 * 
 	 * @param reactionWheelControllerName
 	 * @param alpha
 	 * @throws OrekitException
 	 */
 	public SimulationController(String reactionWheelControllerName, double alpha) throws OrekitException {
-		logger.info("Loading configuration...");
-		try {
-			logger.info("Reading \"simulationcontroller.properties\"...");
-			InputStream in = ClassLoader.getSystemResourceAsStream("simulationcontroller.properties");
-			if (in == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration file \"simulationcontroller.properties\" not found"));
-			}
-			simulationConfiguration.load(in);
-			in.close();
-			final String configName = simulationConfiguration.getProperty("satellite.properties");
-			if (configName == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration \"satellite.properties\" is not defined"));
-			}
-			logger.info("Reading \"" + configName + ".properties\"...");
-			in = ClassLoader.getSystemResourceAsStream(configName + ".properties");
-			if (in == null) {
-				throw new OrekitException(new DummyLocalizable("Configuration file \"" + configName + "\" not found"));
-			}
-			satelliteConfiguration.load(in);
-			in.close();
-		} catch (IOException io) {
-			throw new OrekitException(new DummyLocalizable("problems loading simulationcontroller.properties"), io);
-		}
-		logger.info("Configuration loaded.");
+		loadDefaultConfiguration();
 
 		// setting initial attitude
 		this.initialAttitude = new double[] {
@@ -242,32 +166,7 @@ public class SimulationController implements Runnable {
 	 * @throws OrekitException
 	 */
 	public SimulationController(String reactionWheelControllerName, Properties inertiaTensor) throws OrekitException {
-		logger.info("Loading configuration...");
-		try {
-			logger.info("Reading \"simulationcontroller.properties\"...");
-			InputStream in = ClassLoader.getSystemResourceAsStream("simulationcontroller.properties");
-			if (in == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration file \"simulationcontroller.properties\" not found"));
-			}
-			simulationConfiguration.load(in);
-			in.close();
-			final String configName = simulationConfiguration.getProperty("satellite.properties");
-			if (configName == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration \"satellite.properties\" is not defined"));
-			}
-			logger.info("Reading \"" + configName + ".properties\"...");
-			in = ClassLoader.getSystemResourceAsStream(configName + ".properties");
-			if (in == null) {
-				throw new OrekitException(new DummyLocalizable("Configuration file \"" + configName + "\" not found"));
-			}
-			satelliteConfiguration.load(in);
-			in.close();
-		} catch (IOException io) {
-			throw new OrekitException(new DummyLocalizable("problems loading simulationcontroller.properties"), io);
-		}
-		logger.info("Configuration loaded.");
+		loadDefaultConfiguration();
 
 		// setting initial attitude
 		this.initialAttitude = new double[] {
@@ -293,35 +192,13 @@ public class SimulationController implements Runnable {
 	 * 
 	 * @param reactionWheelControllerName
 	 * @param inertiaTensor
+	 * @param initialAttitude
+	 * @param initialAngularVelocity
+	 * 
 	 * @throws OrekitException
 	 */
 	public SimulationController(String reactionWheelControllerName, Properties inertiaTensor, double[] initialAttitude, double[] initialAngularVelocity) throws OrekitException {
-		logger.info("Loading configuration...");
-		try {
-			logger.info("Reading \"simulationcontroller.properties\"...");
-			InputStream in = ClassLoader.getSystemResourceAsStream("simulationcontroller.properties");
-			if (in == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration file \"simulationcontroller.properties\" not found"));
-			}
-			simulationConfiguration.load(in);
-			in.close();
-			final String configName = simulationConfiguration.getProperty("satellite.properties");
-			if (configName == null) {
-				throw new OrekitException(
-						new DummyLocalizable("Configuration \"satellite.properties\" is not defined"));
-			}
-			logger.info("Reading \"" + configName + ".properties\"...");
-			in = ClassLoader.getSystemResourceAsStream(configName + ".properties");
-			if (in == null) {
-				throw new OrekitException(new DummyLocalizable("Configuration file \"" + configName + "\" not found"));
-			}
-			satelliteConfiguration.load(in);
-			in.close();
-		} catch (IOException io) {
-			throw new OrekitException(new DummyLocalizable("problems loading simulationcontroller.properties"), io);
-		}
-		logger.info("Configuration loaded.");
+		loadDefaultConfiguration();
 
 		// using initial attitude and angular velocity
 		this.initialAttitude = initialAttitude;
@@ -332,6 +209,32 @@ public class SimulationController implements Runnable {
 				Double.valueOf(simulationConfiguration.getProperty("simulation.step", "0.01d")),
 				Long.valueOf(simulationConfiguration.getProperty("simulation.intervalToStore", "1000")),
 				reactionWheelControllerName, false, 0d, 0d, inertiaTensor);
+	}
+
+	/**
+	 * Constructor based on configuration files. It allows the overriding the
+	 * controller defined in the files as well as the inertia tensor, the initial
+	 * attitude and the initial angular velocity.
+	 * 
+	 * @param reactionWheelControllerName
+	 * @param externalTorqueMagnitude
+	 * @param initialAttitude
+	 * @param initialAngularVelocity
+	 * 
+	 * @throws OrekitException
+	 */
+	public SimulationController(String reactionWheelControllerName, double externalTorqueMagnitude, double[] initialAttitude, double[] initialAngularVelocity) throws OrekitException {
+		loadDefaultConfiguration();
+
+		// using initial attitude and angular velocity
+		this.initialAttitude = initialAttitude;
+		this.initialAngularVelocity = initialAngularVelocity;
+
+		// configuring
+		configure(Double.valueOf(simulationConfiguration.getProperty("simulation.time", "700")),
+				Double.valueOf(simulationConfiguration.getProperty("simulation.step", "0.01d")),
+				Long.valueOf(simulationConfiguration.getProperty("simulation.intervalToStore", "1000")),
+				reactionWheelControllerName, false, 0d, externalTorqueMagnitude, null);
 	}
 
 	/**
@@ -371,6 +274,39 @@ public class SimulationController implements Runnable {
 		this.initialAttitude = initialAttitude;
 		this.initialAngularVelocity = initialAngularVelocity;
 		configure(simulationTime, step, intervalToStore, reactionWheelControllerName, plot, 0d, 0d, null);
+	}
+
+	/**
+	 * Load default configuration from simulation.properties and properties of the satellite.
+	 * 
+	 */
+	private final void loadDefaultConfiguration() throws OrekitException {
+		logger.info("Loading configuration...");
+		try {
+			logger.info("Reading \"simulationcontroller.properties\"...");
+			InputStream in = ClassLoader.getSystemResourceAsStream("simulationcontroller.properties");
+			if (in == null) {
+				throw new OrekitException(
+						new DummyLocalizable("Configuration file \"simulationcontroller.properties\" not found"));
+			}
+			simulationConfiguration.load(in);
+			in.close();
+			final String configName = simulationConfiguration.getProperty("satellite.properties");
+			if (configName == null) {
+				throw new OrekitException(
+						new DummyLocalizable("Configuration \"satellite.properties\" is not defined"));
+			}
+			logger.info("Reading \"" + configName + ".properties\"...");
+			in = ClassLoader.getSystemResourceAsStream(configName + ".properties");
+			if (in == null) {
+				throw new OrekitException(new DummyLocalizable("Configuration file \"" + configName + "\" not found"));
+			}
+			satelliteConfiguration.load(in);
+			in.close();
+		} catch (IOException io) {
+			throw new OrekitException(new DummyLocalizable("problems loading simulationcontroller.properties"), io);
+		}
+		logger.info("Configuration loaded.");
 	}
 
 	/**
