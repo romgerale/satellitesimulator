@@ -35,7 +35,9 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 	final private KinematicsAttitudeProvider underlyingAttitudeProvider;
 	final private Satellite satellite;
 
-	final private RandomDataGenerator externalTorqueGenerator;
+	final private RandomDataGenerator externalTorqueGeneratorX;
+	final private RandomDataGenerator externalTorqueGeneratorY;
+	final private RandomDataGenerator externalTorqueGeneratorZ;
 
 	/**
 	 * @param attitudeProvider
@@ -56,9 +58,13 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 		this.satellite = satellite;
 
 		if (this.satellite.getExternalTorquesMagnitude() != 0) {
-			externalTorqueGenerator = new RandomDataGenerator();
+			externalTorqueGeneratorX = new RandomDataGenerator();
+			externalTorqueGeneratorY = new RandomDataGenerator();
+			externalTorqueGeneratorZ = new RandomDataGenerator();
 		} else {
-			externalTorqueGenerator = null;
+			externalTorqueGeneratorX = null;
+			externalTorqueGeneratorY = null;
+			externalTorqueGeneratorZ = null;
 		}
 
 	}
@@ -90,11 +96,11 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 
 		// external torque
 		RealVector externalTorque = new ArrayRealVector(3, 0);
-		if (externalTorqueGenerator != null) {
+		if (externalTorqueGeneratorX != null) {
 			externalTorque = new ArrayRealVector(new double[] {
-					externalTorqueGenerator.nextNormal(satellite.getExternalTorquesMagnitude(),1d),
-					externalTorqueGenerator.nextNormal(satellite.getExternalTorquesMagnitude(),1d),
-					externalTorqueGenerator.nextNormal(satellite.getExternalTorquesMagnitude(),1d) });
+					externalTorqueGeneratorX.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
+					externalTorqueGeneratorY.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
+					externalTorqueGeneratorZ.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude()});
 		}
 
 		// magnetorquer
