@@ -6,11 +6,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import org.math.plot.utils.FastMath;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import br.inpe.cmc202.simulation.plotter.Plotter;
 
 /**
  * 
@@ -97,6 +100,8 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	public void run() {
 		runSimulations();
 		
+		Map<String, Map<Double, double[][]>> mmap = new TreeMap<String, Map<Double, double[][]>>();
+				
 		for (Double p: mapSimulationsU.keySet()) {
 			final Map<String, List<SimulationController>> mapSimulationsUP = mapSimulationsU.get(p);
 			final Map<String, List<SimulationController>> mapSimulationsNotConvergedUP = mapSimulationsNotConvergedU.get(p);
@@ -105,12 +110,18 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 			computeResults(mapSimulationsUP, mapSimulationsNotConvergedUP, false);
 			logger.info("Computed PERTURBATION {}, CONVERGED {} NOT CONVERGED {}!", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
 			
-			plotDomainOfAttraction(mapSimulationsUP, "CONVERGED "+p, false);
-			plotDomainOfAttraction(mapSimulationsNotConvergedUP, "NOT CONVERGED "+p, false);
+			Map<String, Map<Double, Double>> domainShape = plotDomainOfAttraction(mapSimulationsUP, "CONVERGED "+p, false);
+			consolidateDomainOfAttraction(mmap, p, domainShape);
+			
+			//plotDomainOfAttraction(mapSimulationsNotConvergedUP, "NOT CONVERGED "+p, false);
 			
 			// to check
-			plotSimulations(mapSimulationsNotConvergedUP);
+			//plotSimulations(mapSimulationsNotConvergedUP);
 
+		}
+		
+		if (mmap.size() > 0) {
+			Plotter.plot3DLinesDomainOfAttraction(mmap, "Domain Of Attraction - Uncertainty", true);
 		}
 		
 	}
@@ -153,6 +164,49 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 
 		logger.info("Inertia Tensor: {} ", inertiaTensor);
 		return inertiaTensor;
+	}
+
+	/**
+	 * Consolidate the domain of attraction for all data computed.
+	 * 
+	 * @param mmap - map with all data for the domain of attraction
+	 * @param p - perturbation value
+	 * @param domainShape - shape of the domain of Attraction for a given perturbation
+	 */
+	private void consolidateDomainOfAttraction(Map<String, Map<Double, double[][]>> mmap, Double p,
+			Map<String, Map<Double, Double>> domainShape) {
+		// consolidating results
+		if (domainShape.size() > 0) {
+			// for each controller
+			for (String controller : domainShape.keySet()) {
+				// getting data
+				Map<Double, Double> data = domainShape.get(controller);
+				// getting controller in the consolidated data
+				Map<Double, double[][]> map = mmap.get(controller);
+				if (map == null) {
+					map = new TreeMap<Double, double[][]>();
+					mmap.put(controller, map);
+				}
+				// formatting data for the polygon
+				double[][] xyz = new double[data.size()+2][3] ;
+				int count = 0;
+				for(double x: data.keySet()) {
+					xyz[count][0] = x;
+					xyz[count][1] = data.get(x);
+					xyz[count++][2] = p;
+				}
+				// origin
+				xyz[count][0] = 0d;
+				xyz[count][1] = 0d;
+				xyz[count++][2] = p;
+				// closing the polygon
+				xyz[count][0] = xyz[0][0];
+				xyz[count][1] = xyz[0][1];
+				xyz[count][2] = xyz[0][2];
+				map.put(p, xyz);
+			}
+			
+		}
 	}
 
 	/**

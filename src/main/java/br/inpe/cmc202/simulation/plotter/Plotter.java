@@ -14,6 +14,7 @@ import javax.swing.JFrame;
 import org.apache.commons.lang.ArrayUtils;
 import org.math.plot.Plot2DPanel;
 import org.math.plot.Plot3DPanel;
+import org.math.plot.PlotPanel;
 import org.math.plot.utils.FastMath;
 
 /**
@@ -610,6 +611,48 @@ public class Plotter {
 			// ploting
 			if (values.length > 0) {
 				plot.addScatterPlot(initialState, values);
+			}
+		}
+
+		JFrame frame = new JFrame(name);
+		frame.setSize(600, 600);
+		frame.setContentPane(plot);
+		frame.setVisible(true);
+
+		// listener to close
+		frame.addWindowListener(new WindowAdapter() {
+			public void windowClosing(WindowEvent e) {
+				System.exit(0);
+			}
+		});
+
+	}
+	
+	/**
+	 * Plot for the 3d Domain of Attraction.
+	 * 
+	 * @param toPlot
+	 * @param name
+	 */
+	public static void plot3DLinesDomainOfAttraction(
+			Map<String, Map<Double, double[][]>> mmap, String name, boolean legend) {
+		if (mmap == null || mmap.isEmpty()) {
+			return;
+		}
+
+		// iterating over initial states
+		Plot3DPanel plot = new Plot3DPanel();
+		if (legend) {
+			plot.addLegend("SOUTH");
+		}
+		for (String controller : mmap.keySet()) {
+			Color color = PlotPanel.COLORLIST[controller.length() % PlotPanel.COLORLIST.length];
+			// getting controllers
+			Map<Double, double[][]> lines = mmap.get(controller);
+			boolean first = true;
+			for (double p: lines.keySet() ) {
+				plot.addLinePlot((first)?controller:null, color, lines.get(p));
+				first = false;
 			}
 		}
 

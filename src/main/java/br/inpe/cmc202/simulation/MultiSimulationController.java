@@ -20,6 +20,8 @@ import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.RotationOrder;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.geometry.euclidean.twod.PolygonsSet;
+import org.hipparchus.geometry.euclidean.twod.Vector2D;
 import org.hipparchus.linear.ArrayRealVector;
 import org.hipparchus.linear.RealVector;
 import org.hipparchus.random.RandomDataGenerator;
@@ -439,7 +441,7 @@ public class MultiSimulationController implements Runnable {
 	 * For plotting the domain of attraction.
 	 * 
 	 */
-	protected void plotDomainOfAttraction(Map<String, List<SimulationController>> simulations, 
+	protected Map<String, Map<Double, Double>> plotDomainOfAttraction(Map<String, List<SimulationController>> simulations, 
 			String label, 
 			boolean plotAttitudeAndAngularVelocity) {
 		logger.info("----------------------------");
@@ -450,6 +452,7 @@ public class MultiSimulationController implements Runnable {
 		final Map<String, Map<Double, double[]>> domainOfAttractionNorm = new TreeMap<String, Map<Double, double[]>>();
 		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
 		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
+		final Map<String, Map<Double, Double>> domainOfAttractionNormShape = new TreeMap<String, Map<Double, Double>>();
 
 		// for each controller
 		for (String controller : simulations.keySet()) {
@@ -488,7 +491,6 @@ public class MultiSimulationController implements Runnable {
 
 		if (hasSomeDomainOfAttraction) {
 			// logging the results and trying to compute a polygon for the domain of attraction 
-			final Map<String, Map<Double, Double>> domainOfAttractionNormShape = new TreeMap<String, Map<Double, Double>>();
 			for (String controller : simulations.keySet()) {
 				
 				int ran = 0;
@@ -548,24 +550,31 @@ public class MultiSimulationController implements Runnable {
 				if (label != null && label.startsWith("CONVERGED")) {
 					Map<Double, Double> data = new TreeMap<Double, Double>();
 					for (double i : domainOfAttractionNorm.get(controller).keySet()) {
-						data.put(domainOfAttractionNorm.get(controller).get(i)[0], domainOfAttractionNorm.get(controller).get(i)[1]);
+						final double x = domainOfAttractionNorm.get(controller).get(i)[0];
+						final double y = domainOfAttractionNorm.get(controller).get(i)[1];
+						// checking presence of same data
+						final Double xPresent = data.get(x);
+						if (xPresent == null || y > xPresent.doubleValue()) {
+							data.put(x, y);
+						}
 					}
 					// filtering results
 					if (data.size() > 0) {
 						Map<Double, Double> filteredData = new TreeMap<Double, Double>();
 						final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
-						final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
+						//final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
 						final double start = x[0];
 						final double end = x[x.length-1];
-						final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
+						//final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
 						
 						// first point "FAKE" reusing y and x=0
 						filteredData.put(0d, data.get(start));
 						
-						int j = 0;
+						//int j = 0;
 						for (int k = 0; k < x.length; ) {
-							final double startInterval = start + lengthIntervalToAggregate * j;
-							final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
+							//final double startInterval = start + lengthIntervalToAggregate * j;
+							//final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
+							final double endInterval = x[k];
 							final double initialX = x[k];
 							double currentX = initialX;
 							double maxY = 0d;
@@ -577,12 +586,22 @@ public class MultiSimulationController implements Runnable {
 								if (k > x.length - 1) break;
 								currentX = x[k];
 							}
-							j++;
+							//j++;
 							if (maxY > 0 ) filteredData.put(x[k-1], maxY);
 						}
 	
 						// last point "FAKE" reusing x and y=0
 						filteredData.put(end+1E-10, 0d);
+						
+						// trying to calculate the area of the polygon
+						Vector2D[] vec = new Vector2D[filteredData.size()+1];
+						int count = 0;
+						for (double xx : filteredData.keySet()) {
+							vec[count++] = new Vector2D(xx, filteredData.get(xx));
+						}
+						vec[filteredData.size()] = new Vector2D(0d, 0d);
+						PolygonsSet polygon = new PolygonsSet(1.0e-5d, vec); 
+						logger.info("Area controller {} = {}", controller, polygon.getSize()); //TODO check area of the polygon
 	
 						domainOfAttractionNormShape.put(controller, filteredData);
 					} else {
@@ -605,6 +624,8 @@ public class MultiSimulationController implements Runnable {
 		
 		logger.info("Domain of Attraction ({}) plotted {}!", label, hasSomeDomainOfAttraction);
 		logger.info("----------------------------");
+		
+		return domainOfAttractionNormShape;
 	}
 
 	//****
