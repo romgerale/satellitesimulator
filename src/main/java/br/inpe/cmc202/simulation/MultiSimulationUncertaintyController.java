@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
+import org.hipparchus.util.Precision;
 import org.math.plot.utils.FastMath;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
@@ -33,9 +34,9 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 					"ProportionalNonLinearQuaternionSDREController_GIBBS"));
 					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 	
-	final double LOWER_DEVIATION = -3E-1d; 
-	final double UPPER_DEVIATION = 3E-1d;  
-	final int NUMBER_OF_DEVIATIONS = 10;  
+	final double LOWER_DEVIATION = -4E-4d; //-3E-1d for parametric, -4E-4d for unstructured
+	final double UPPER_DEVIATION = +4E-4d; //+3E-1d for parametric, +4E-4d for unstructured
+	final int NUMBER_OF_DEVIATIONS = 11;  
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
@@ -51,11 +52,14 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		final Map<Double, double[]> initialAngularVelocitiesComputed = initialAngularVelocities.get("initialAngularVelocities");
 
 		//computing perturbation
-		double stepPerturbation = (FastMath.abs(LOWER_DEVIATION)+FastMath.abs(UPPER_DEVIATION)) / (double) NUMBER_OF_DEVIATIONS;
+		double stepPerturbation = (FastMath.abs(LOWER_DEVIATION)+FastMath.abs(UPPER_DEVIATION)) / ((double) NUMBER_OF_DEVIATIONS - 1d);
 		logger.info("Configuring perturbation (TYPE={}, 0 = Parametric(InertiaTensor), 1 = Unstructured(externalTorques))... lower: {} upper: {} step: {}", perturbationType, LOWER_DEVIATION, UPPER_DEVIATION, stepPerturbation);
+		for(double p = LOWER_DEVIATION; p < UPPER_DEVIATION || Precision.equals(p, UPPER_DEVIATION, UPPER_DEVIATION/NUMBER_OF_DEVIATIONS); p+=stepPerturbation) {			
+			logger.info("Perturbation TYPE={} VALUE={}!", perturbationType, p);
+		}
 		
 		// PERTURBATION
-		for(double p = LOWER_DEVIATION; p <= UPPER_DEVIATION; p+=stepPerturbation) {			
+		for(double p = LOWER_DEVIATION; p < UPPER_DEVIATION || Precision.equals(p, UPPER_DEVIATION, UPPER_DEVIATION/NUMBER_OF_DEVIATIONS); p+=stepPerturbation) {			
 			final Map<String, List<SimulationController>> mapSimulationsUP = new HashMap<String, List<SimulationController>>();
 			final Map<String, List<SimulationController>> mapSimulationsNotConvergedUP = new HashMap<String, List<SimulationController>>();
 			
@@ -121,7 +125,14 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		}
 		
 		if (mmap.size() > 0) {
-			Plotter.plot3DLinesDomainOfAttraction(mmap, "Domain Of Attraction - Uncertainty", true);
+			// plotting each domain of attraction separated
+			for (String controller: mmap.keySet()) {
+				Map<Double, double[][]> map = mmap.get(controller);
+				Map<String, Map<Double, double[][]>> mmapP = new TreeMap<String, Map<Double, double[][]>>();
+				mmapP.put(controller, map);
+				
+				Plotter.plot3DLinesDomainOfAttraction(mmapP, "Domain Of Attraction - Uncertainty - " + controller, false);
+			}
 		}
 		
 	}

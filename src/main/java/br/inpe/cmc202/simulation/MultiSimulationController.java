@@ -594,14 +594,17 @@ public class MultiSimulationController implements Runnable {
 						filteredData.put(end+1E-10, 0d);
 						
 						// trying to calculate the area of the polygon
+						// in the reverse order due to the convention of PolygonsSet
+						// "The interior part of the region is on the left side of this path and the exterior is on its right side.
 						Vector2D[] vec = new Vector2D[filteredData.size()+1];
-						int count = 0;
+						int count = filteredData.size();
 						for (double xx : filteredData.keySet()) {
-							vec[count++] = new Vector2D(xx, filteredData.get(xx));
+							vec[count--] = new Vector2D(xx, filteredData.get(xx));
+							
 						}
-						vec[filteredData.size()] = new Vector2D(0d, 0d);
-						PolygonsSet polygon = new PolygonsSet(1.0e-5d, vec); 
-						logger.info("Area controller {} = {}", controller, polygon.getSize()); //TODO check area of the polygon
+						vec[0] = new Vector2D(0d, 0d);
+						PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
+						logger.info("Area controller {} = {} ", controller, polygon.getSize());
 	
 						domainOfAttractionNormShape.put(controller, filteredData);
 					} else {

@@ -112,6 +112,9 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 					new ArrayRealVector(satellite.getSetOfMagnetorquer()
 							.getState().getControlTorque().toArray())
 							.add(externalTorque));
+		} else {
+			firstComponent = satellite.getI_inverse().operate(
+							externalTorque);
 		}
 
 		// rigid body

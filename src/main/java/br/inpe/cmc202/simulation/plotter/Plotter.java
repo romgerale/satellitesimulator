@@ -646,13 +646,11 @@ public class Plotter {
 			plot.addLegend("SOUTH");
 		}
 		for (String controller : mmap.keySet()) {
-			Color color = PlotPanel.COLORLIST[controller.length() % PlotPanel.COLORLIST.length];
+			Color color = PlotPanel.COLORLIST[(controller.length() + 2) % PlotPanel.COLORLIST.length];
 			// getting controllers
 			Map<Double, double[][]> lines = mmap.get(controller);
-			boolean first = true;
 			for (double p: lines.keySet() ) {
-				plot.addLinePlot((first)?controller:null, color, lines.get(p));
-				first = false;
+				plot.addLinePlot(controller, color, lines.get(p));
 			}
 		}
 
