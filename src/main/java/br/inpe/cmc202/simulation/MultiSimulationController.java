@@ -604,7 +604,13 @@ public class MultiSimulationController implements Runnable {
 						}
 						vec[0] = new Vector2D(0d, 0d);
 						PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
-						logger.info("Area controller {} = {} ", controller, polygon.getSize());
+						try {
+							logger.info("Area controller {} = {} ", controller, polygon.getSize());
+						} catch (Exception e) {
+							// numerical problems is possible
+							logger.error("Numerical problems calculating area of the polygon with vertices {}", vec.toString());
+							logger.error("Numerical error", e);
+						}
 	
 						domainOfAttractionNormShape.put(controller, filteredData);
 					} else {
