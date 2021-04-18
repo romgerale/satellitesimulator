@@ -496,7 +496,7 @@ public class SimulationController implements Runnable {
 		final Set<Double> timesToEvaluate = new TreeSet<Double>(this.stepHandler.quaternionError.keySet());
 		timesToEvaluate.removeIf(v -> v < tToTestConvergence );
 
-		final double epsilon = 1.E-3;
+		final double epsilon = 1.E-2;
 		for (final Double t : timesToEvaluate) {
 			final double[] quaternionError = this.stepHandler.quaternionError.get(t);
 			final double[] angularVelocityError = this.stepHandler.angularVelocityBody.get(t);
@@ -512,7 +512,7 @@ public class SimulationController implements Runnable {
 					angularVelocityError[1],
 					angularVelocityError[2]});
 			if (stateSpace.getNorm() > epsilon) {
-				logger.debug("NOT CONVERGED! norm {} epsilon {}", stateSpace.getNorm(), epsilon);
+				logger.info("NOT CONVERGED! norm {} epsilon {}", stateSpace.getNorm(), epsilon);
 				convergenceStateSpace = false;
 				break;
 			}

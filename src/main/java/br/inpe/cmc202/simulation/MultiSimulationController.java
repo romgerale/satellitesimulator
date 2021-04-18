@@ -427,9 +427,35 @@ public class MultiSimulationController implements Runnable {
 		}
 
 		if (someValueComputed && plotStatistics) {
-			Plotter.plot2DScatter(stateSpaceStats, "Statistics of L2 Norm of State Space - CONVERGED",
+			// computing mean and standard deviation of overall mean by each controller
+			// for each controller
+			final Map<String, Map<Double, double[]>> stateSpaceStatsForGraph = new TreeMap<String, Map<Double, double[]>>();
+			final Map<String, Map<Double, double[]>> reactionWheelStatsForGraph = new TreeMap<String, Map<Double, double[]>>();
+
+			for (String controller : stateSpaceStats.keySet()) {
+				final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
+				final DescriptiveStatistics statReactionWheelOverall = new DescriptiveStatistics();
+				for (final double i: stateSpaceStats.get(controller).keySet()) {
+					final double[] meanStd = stateSpaceStats.get(controller).get(i);
+					statStateSpaceOverall.addValue(meanStd[0]);
+				}
+				for (final double i: reactionWheelStats.get(controller).keySet()) {
+					final double[] meanStd = reactionWheelStats.get(controller).get(i);
+					statReactionWheelOverall.addValue(meanStd[0]);
+				}
+				stateSpaceStatsForGraph.put(controller + " (Mean=" + statStateSpaceOverall.getMean() + 
+						                                 ",Std=" + statStateSpaceOverall.getStandardDeviation() + 
+						                                 ",Samples="+statStateSpaceOverall.getN()+")", 
+						                                 stateSpaceStats.get(controller));
+				reactionWheelStatsForGraph.put(controller + " (Mean="+statReactionWheelOverall.getMean() + 
+														 ",Std=" + statReactionWheelOverall.getStandardDeviation() + 
+														 ",Samples="+statReactionWheelOverall.getN()+")", 
+						                                 reactionWheelStats.get(controller));
+			}
+
+			Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED",
 					new String[] {"mean of Norm", "standard deviation of Norm"});
-			Plotter.plot2DScatter(reactionWheelStats, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED",
+			Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED",
 					new String[] {"mean of Norm", "standard deviation of Norm"});
 		}
 		logger.info("Results computed {} and polygon enforced {}!", someValueComputed, someSimulationPolygon);
