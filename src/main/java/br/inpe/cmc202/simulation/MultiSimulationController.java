@@ -81,8 +81,8 @@ public class MultiSimulationController implements Runnable {
 
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					"ProportionalNonLinearQuaternionSDREController_GIBBS"));//,
-					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+					"ProportionalNonLinearQuaternionSDREController_GIBBS",
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 					//"ProportionalNonLinearMRPSDREController_FIRST"));
 					//"ProportionalNonLinearMRPSDREHInfinityController"));
 					//"NopeController"));
@@ -453,6 +453,7 @@ public class MultiSimulationController implements Runnable {
 		final Map<String, Map<Double, double[]>> domainOfAttractionAttitude = new TreeMap<String, Map<Double, double[]>>();
 		final Map<String, Map<Double, double[]>> domainOfAttractionAngularVelocity = new TreeMap<String, Map<Double, double[]>>();
 		final Map<String, Map<Double, Double>> domainOfAttractionNormShape = new TreeMap<String, Map<Double, Double>>();
+		final Map<String, Map<Double, Double>> domainOfAttractionNormShapeForGraph = new TreeMap<String, Map<Double, Double>>();
 
 		// for each controller
 		for (String controller : simulations.keySet()) {
@@ -593,26 +594,27 @@ public class MultiSimulationController implements Runnable {
 						// last point "FAKE" reusing x and y=0
 						filteredData.put(end+1E-10, 0d);
 						
-						// trying to calculate the area of the polygon
-						// in the reverse order due to the convention of PolygonsSet
-						// "The interior part of the region is on the left side of this path and the exterior is on its right side.
-						Vector2D[] vec = new Vector2D[filteredData.size()+1];
-						int count = filteredData.size();
-						for (double xx : filteredData.keySet()) {
-							vec[count--] = new Vector2D(xx, filteredData.get(xx));
-							
-						}
-						vec[0] = new Vector2D(0d, 0d);
-						PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
+						double area = 0d;
 						try {
-							logger.info("Area controller {} = {} ", controller, polygon.getSize());
+							// trying to calculate the area of the polygon
+							// in the reverse order due to the convention of PolygonsSet
+							// "The interior part of the region is on the left side of this path and the exterior is on its right side.
+							Vector2D[] vec = new Vector2D[filteredData.size()+1];
+							int count = filteredData.size();
+							for (double xx : filteredData.keySet()) {
+								vec[count--] = new Vector2D(xx, filteredData.get(xx));	
+							}
+							vec[0] = new Vector2D(0d, 0d);
+							PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
+							area = polygon.getSize();
+							logger.info("Area controller {} = {} ", controller, area);
 						} catch (Exception e) {
 							// numerical problems is possible
-							logger.error("Numerical problems calculating area of the polygon with vertices {}", vec.toString());
-							logger.error("Numerical error", e);
+							logger.error("Numerical problems calculating area of the polygon for controller " + controller, e);
 						}
 	
 						domainOfAttractionNormShape.put(controller, filteredData);
+						domainOfAttractionNormShapeForGraph.put(controller + " (area= "+area+")", filteredData);
 					} else {
 						logger.info("No data available for computing the shape of {}!", controller);
 					}
@@ -627,7 +629,7 @@ public class MultiSimulationController implements Runnable {
 				Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
 				Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
 			}
-			Plotter.plot2DLine(domainOfAttractionNormShape, "Domain of Attraction - Norm - Shape " + label,
+			Plotter.plot2DLine(domainOfAttractionNormShapeForGraph, "Domain of Attraction - Norm - Shape " + label,
 					true);
 		}
 		
