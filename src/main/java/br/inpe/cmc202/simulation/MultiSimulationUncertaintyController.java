@@ -42,7 +42,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	final double LOWER_DEVIATION_UNSTRUCTURED = 0d; 
 	final double UPPER_DEVIATION_UNSTRUCTURED = +3E-1d;
 			
-	final int NUMBER_OF_DEVIATIONS = 3;  
+	final int NUMBER_OF_DEVIATIONS = 13;  
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
