@@ -152,7 +152,7 @@ public class MultiSimulationController implements Runnable {
 	public void run() {
 		runSimulations();
 		
-		computeResults(mapSimulations, mapSimulationsNotConverged, true);
+		computeResults(mapSimulations, mapSimulationsNotConverged, 0d, true);
 
 		plotSimulations(mapSimulations);
 		
@@ -309,7 +309,7 @@ public class MultiSimulationController implements Runnable {
 	 * 
 	 */
 	protected void computeResults(Map<String, List<SimulationController>> mapSimulations, 
-			Map<String, List<SimulationController>> mapSimulationsNotConverged,
+			Map<String, List<SimulationController>> mapSimulationsNotConverged, Double p,
 			boolean plotStatistics) {
 		logger.info("----------------------------");
 		logger.info("Computing results...");
@@ -453,9 +453,9 @@ public class MultiSimulationController implements Runnable {
 						                                 reactionWheelStats.get(controller));
 			}
 
-			Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED",
+			Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED " + p,
 					new String[] {"mean of Norm", "standard deviation of Norm"});
-			Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED",
+			Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED " + p,
 					new String[] {"mean of Norm", "standard deviation of Norm"});
 		}
 		logger.info("Results computed {} and polygon enforced {}!", someValueComputed, someSimulationPolygon);
@@ -656,7 +656,7 @@ public class MultiSimulationController implements Runnable {
 				Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
 			}
 			Plotter.plot2DLine(domainOfAttractionNormShapeForGraph, "Domain of Attraction - Norm - Shape " + label,
-					true);
+					true, new String[] {"norm of Euler Angles", "norm of angular velocity"});
 		}
 		
 		logger.info("Domain of Attraction ({}) plotted {}!", label, hasSomeDomainOfAttraction);

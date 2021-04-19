@@ -31,12 +31,18 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					"ProportionalNonLinearQuaternionSDREController_GIBBS"));
-					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+					"ProportionalNonLinearQuaternionSDREController_GIBBS",
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 	
-	final double LOWER_DEVIATION = -4E-4d; //-3E-1d for parametric, -4E-4d for unstructured
-	final double UPPER_DEVIATION = +4E-4d; //+3E-1d for parametric, +4E-4d for unstructured
-	final int NUMBER_OF_DEVIATIONS = 11;  
+	// percent
+	final double LOWER_DEVIATION_PARAMETRIC = -3E-1d; 
+	final double UPPER_DEVIATION_PARAMETRIC = +3E-1d; 
+	// it is based on a white noise, so there is no mean to use negative values for magnitude
+	// percent of max torque of reaction wheel
+	final double LOWER_DEVIATION_UNSTRUCTURED = 0d; 
+	final double UPPER_DEVIATION_UNSTRUCTURED = +3E-1d;
+			
+	final int NUMBER_OF_DEVIATIONS = 3;  
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
@@ -51,6 +57,18 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		final Map<Double, double[]> initialAnglesComputed = initialAngles.get("initialAngles");
 		final Map<Double, double[]> initialAngularVelocitiesComputed = initialAngularVelocities.get("initialAngularVelocities");
 
+		double LOWER_DEVIATION = 0d;
+		double UPPER_DEVIATION = 0d;
+		if (perturbationType == 0) {
+			LOWER_DEVIATION = LOWER_DEVIATION_PARAMETRIC;
+			UPPER_DEVIATION = UPPER_DEVIATION_PARAMETRIC;
+		} else {
+			final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
+			final Double maxTorque = ss.satellite.getSetOfReactionWheels().getMAX_TORQ();
+			LOWER_DEVIATION = maxTorque * LOWER_DEVIATION_UNSTRUCTURED;
+			UPPER_DEVIATION = maxTorque * UPPER_DEVIATION_UNSTRUCTURED;
+		}
+		
 		//computing perturbation
 		double stepPerturbation = (FastMath.abs(LOWER_DEVIATION)+FastMath.abs(UPPER_DEVIATION)) / ((double) NUMBER_OF_DEVIATIONS - 1d);
 		logger.info("Configuring perturbation (TYPE={}, 0 = Parametric(InertiaTensor), 1 = Unstructured(externalTorques))... lower: {} upper: {} step: {}", perturbationType, LOWER_DEVIATION, UPPER_DEVIATION, stepPerturbation);
@@ -111,7 +129,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 			final Map<String, List<SimulationController>> mapSimulationsNotConvergedUP = mapSimulationsNotConvergedU.get(p);
 
 			logger.info("Computing PERTURBATION {}, CONVERGED {} NOT CONVERGED {}...", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
-			computeResults(mapSimulationsUP, mapSimulationsNotConvergedUP, false);
+			computeResults(mapSimulationsUP, mapSimulationsNotConvergedUP, p, true);
 			logger.info("Computed PERTURBATION {}, CONVERGED {} NOT CONVERGED {}!", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
 			
 			Map<String, Map<Double, Double>> domainShape = plotDomainOfAttraction(mapSimulationsUP, "CONVERGED "+p, false);

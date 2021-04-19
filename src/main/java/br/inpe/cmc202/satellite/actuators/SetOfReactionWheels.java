@@ -192,4 +192,11 @@ public class SetOfReactionWheels {
 		return MAX_ANGULAR_VELOCITY;
 	}
 
+	/**
+	 * @return the maximum torque in Newton.meter (N.m)
+	 */	
+	public double getMAX_TORQ() {
+		return MAX_TORQ;
+	}
+
 }

@@ -429,8 +429,6 @@ public class Plotter {
 	 * 
 	 * @param map
 	 * @param name
-	 * @param toDegrees
-	 * @param label
 	 */
 	public static void plot2DLine(Map<String, Map<Double, Double>> mmap,
 			String name) {
@@ -442,11 +440,24 @@ public class Plotter {
 	 * 
 	 * @param map
 	 * @param name
-	 * @param toDegrees
-	 * @param label
+	 * @param legend
 	 */
 	public static void plot2DLine(Map<String, Map<Double, Double>> mmap,
 			String name, boolean legend) {
+		plot2DLine(mmap, name, legend, new String[] {"time (s)", "det. controllability"});	
+
+	}
+	
+	/**
+	 * General used 2d line.
+	 * 
+	 * @param map
+	 * @param name
+	 * @param legend
+	 * @param labels
+	 */
+	public static void plot2DLine(Map<String, Map<Double, Double>> mmap,
+			String name, boolean legend, String[] axisLabels) {
 
 		if (mmap.size() == 0) {
 			return;
@@ -468,7 +479,7 @@ public class Plotter {
 
 		// ploting
 		Plot2DPanel plot = new Plot2DPanel();
-		plot.setAxisLabels("time (s)", "det. controllability");
+		plot.setAxisLabels(axisLabels);
 		if (legend) {
 			plot.addLegend("SOUTH");
 		}
