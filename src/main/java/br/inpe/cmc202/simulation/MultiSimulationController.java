@@ -374,91 +374,222 @@ public class MultiSimulationController implements Runnable {
 			}
 		}
 		
-		
-		boolean someValueComputed = false;
-		
-		final Map<String, Map<Double, double[]>> stateSpaceStats = new TreeMap<String, Map<Double, double[]>>();
-		final Map<String, Map<Double, double[]>> reactionWheelStats = new TreeMap<String, Map<Double, double[]>>();
-
-		// for each controller
-		for (String controller : mapSimulations.keySet()) {
-			double i = 0d;
-			stateSpaceStats.put(controller, new TreeMap<Double, double[]>());
-			reactionWheelStats.put(controller, new TreeMap<Double, double[]>());
-
-			// for each simulation for a given controller
-			for (SimulationController s : mapSimulations.get(controller)) {
-				final DescriptiveStatistics statStateSpace = new DescriptiveStatistics();
-				final DescriptiveStatistics statReactionWheel = new DescriptiveStatistics();
-				
-				for (Double t : s.stepHandler.quaternionError.keySet()) {
-					final double[] quartenionError = s.stepHandler.quaternionError.get(t);
-					final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
-					final double reactionWheelAngularMomentum = s.stepHandler.reactionWheelNormAngularMomentum.get(t);
-					
-					// calculate statistics of the norm of state space: 
-					// quaternion (last entry as scalar and adjusted to origin) 
-					// and angular velocity
-					final RealVector stateSpace = new ArrayRealVector(new double[] { 
-							quartenionError[0],
-							quartenionError[1],
-							quartenionError[2], 
-							1-FastMath.abs(quartenionError[3]), // adjusting to origin 0
-							angularVelocityError[0],
-							angularVelocityError[1],
-							angularVelocityError[2]});
-					logger.debug("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
-					statStateSpace.addValue(stateSpace.getNorm());
-					
-					statReactionWheel.addValue(reactionWheelAngularMomentum);
-					
-					someValueComputed = true;
-				}
-												
-				stateSpaceStats.get(controller).put(++i, new double[] {
-						statStateSpace.getMean(),
-						statStateSpace.getStandardDeviation()});
-
-				reactionWheelStats.get(controller).put(++i, new double[] {
-						statReactionWheel.getMean(),
-						statReactionWheel.getStandardDeviation()});
-			}
-
-		}
-
-		if (someValueComputed && plotStatistics) {
-			// computing mean and standard deviation of overall mean by each controller
+		// COMPUTING measures about norm of state space and norm of reaction wheel angular momentum
+		{
+			boolean someValueComputed = false;
+			
+			final Map<String, Map<Double, double[]>> stateSpaceStats = new TreeMap<String, Map<Double, double[]>>();
+			final Map<String, Map<Double, double[]>> reactionWheelStats = new TreeMap<String, Map<Double, double[]>>();
+	
 			// for each controller
-			final Map<String, Map<Double, double[]>> stateSpaceStatsForGraph = new TreeMap<String, Map<Double, double[]>>();
-			final Map<String, Map<Double, double[]>> reactionWheelStatsForGraph = new TreeMap<String, Map<Double, double[]>>();
-
-			for (String controller : stateSpaceStats.keySet()) {
-				final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
-				final DescriptiveStatistics statReactionWheelOverall = new DescriptiveStatistics();
-				for (final double i: stateSpaceStats.get(controller).keySet()) {
-					final double[] meanStd = stateSpaceStats.get(controller).get(i);
-					statStateSpaceOverall.addValue(meanStd[0]);
+			for (String controller : mapSimulations.keySet()) {
+				double i = 0d;
+				stateSpaceStats.put(controller, new TreeMap<Double, double[]>());
+				reactionWheelStats.put(controller, new TreeMap<Double, double[]>());
+	
+				// for each simulation for a given controller
+				for (SimulationController s : mapSimulations.get(controller)) {
+					final DescriptiveStatistics statStateSpace = new DescriptiveStatistics();
+					final DescriptiveStatistics statReactionWheel = new DescriptiveStatistics();
+					
+					for (Double t : s.stepHandler.quaternionError.keySet()) {
+						final double[] quartenionError = s.stepHandler.quaternionError.get(t);
+						final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
+						final double reactionWheelAngularMomentum = s.stepHandler.reactionWheelNormAngularMomentum.get(t);
+						
+						// calculate statistics of the norm of state space: 
+						// quaternion (last entry as scalar and adjusted to origin) 
+						// and angular velocity
+						final RealVector stateSpace = new ArrayRealVector(new double[] { 
+								quartenionError[0],
+								quartenionError[1],
+								quartenionError[2], 
+								1-FastMath.abs(quartenionError[3]), // adjusting to origin 0
+								angularVelocityError[0],
+								angularVelocityError[1],
+								angularVelocityError[2]});
+						logger.debug("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
+						statStateSpace.addValue(stateSpace.getNorm());
+						
+						statReactionWheel.addValue(reactionWheelAngularMomentum);
+						
+						someValueComputed = true;
+					}
+													
+					stateSpaceStats.get(controller).put(++i, new double[] {
+							statStateSpace.getMean(),
+							statStateSpace.getStandardDeviation()});
+	
+					reactionWheelStats.get(controller).put(++i, new double[] {
+							statReactionWheel.getMean(),
+							statReactionWheel.getStandardDeviation()});
 				}
-				for (final double i: reactionWheelStats.get(controller).keySet()) {
-					final double[] meanStd = reactionWheelStats.get(controller).get(i);
-					statReactionWheelOverall.addValue(meanStd[0]);
-				}
-				stateSpaceStatsForGraph.put(controller + " (Mean=" + statStateSpaceOverall.getMean() + 
-						                                 ",Std=" + statStateSpaceOverall.getStandardDeviation() + 
-						                                 ",Samples="+statStateSpaceOverall.getN()+")", 
-						                                 stateSpaceStats.get(controller));
-				reactionWheelStatsForGraph.put(controller + " (Mean="+statReactionWheelOverall.getMean() + 
-														 ",Std=" + statReactionWheelOverall.getStandardDeviation() + 
-														 ",Samples="+statReactionWheelOverall.getN()+")", 
-						                                 reactionWheelStats.get(controller));
+	
 			}
-
-			Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED " + p,
-					new String[] {"mean of Norm", "standard deviation of Norm"});
-			Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED " + p,
-					new String[] {"mean of Norm", "standard deviation of Norm"});
+	
+			if (someValueComputed && plotStatistics) {
+				// computing mean and standard deviation of overall mean by each controller
+				// for each controller
+				final Map<String, Map<Double, double[]>> stateSpaceStatsForGraph = new TreeMap<String, Map<Double, double[]>>();
+				final Map<String, Map<Double, double[]>> reactionWheelStatsForGraph = new TreeMap<String, Map<Double, double[]>>();
+	
+				for (String controller : stateSpaceStats.keySet()) {
+					final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
+					final DescriptiveStatistics statReactionWheelOverall = new DescriptiveStatistics();
+					for (final double i: stateSpaceStats.get(controller).keySet()) {
+						final double[] meanStd = stateSpaceStats.get(controller).get(i);
+						statStateSpaceOverall.addValue(meanStd[0]);
+					}
+					for (final double i: reactionWheelStats.get(controller).keySet()) {
+						final double[] meanStd = reactionWheelStats.get(controller).get(i);
+						statReactionWheelOverall.addValue(meanStd[0]);
+					}
+					stateSpaceStatsForGraph.put(controller + " (Mean=" + statStateSpaceOverall.getMean() + 
+							                                 ",Std=" + statStateSpaceOverall.getStandardDeviation() + 
+							                                 ",Samples="+statStateSpaceOverall.getN()+")", 
+							                                 stateSpaceStats.get(controller));
+					reactionWheelStatsForGraph.put(controller + " (Mean="+statReactionWheelOverall.getMean() + 
+															 ",Std=" + statReactionWheelOverall.getStandardDeviation() + 
+															 ",Samples="+statReactionWheelOverall.getN()+")", 
+							                                 reactionWheelStats.get(controller));
+				}
+	
+				Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED " + p,
+						new String[] {"mean of Norm", "standard deviation of Norm"});
+				Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED " + p,
+						new String[] {"mean of Norm", "standard deviation of Norm"});
+			}
+			logger.info("Results computed {} about norm of state space and norm of reaction wheel angular momentum!", someValueComputed);
 		}
-		logger.info("Results computed {} and polygon enforced {}!", someValueComputed, someSimulationPolygon);
+		
+		// COMPUTING measures about 
+		// 1) sum of norm of state space and sum of norm of control torque (reaction wheel control torque)
+		// 2) sum of norm of actual x ideal control
+		// 3) gamma for H-infinity (min and max)
+		{
+			boolean someValueComputed = false;
+			
+			final Map<String, Map<Double, double[]>> optimalStateControl = new TreeMap<String, Map<Double, double[]>>();
+			final Map<String, Map<Double, double[]>> optimalIdealActualTorque = new TreeMap<String, Map<Double, double[]>>();
+			final Map<String, Map<Double, double[]>> minMaxGamma = new TreeMap<String, Map<Double, double[]>>();
+	
+			// for each controller
+			for (String controller : mapSimulations.keySet()) {
+				double i = 0d;
+				optimalStateControl.put(controller, new TreeMap<Double, double[]>());
+				optimalIdealActualTorque.put(controller, new TreeMap<Double, double[]>());
+				minMaxGamma.put(controller, new TreeMap<Double, double[]>());
+				
+				// for each simulation for a given controller
+				for (SimulationController s : mapSimulations.get(controller)) {
+					double sumNormStateSpace = 0d;
+					double sumNormActualControl = 0d;
+					double sumNormIdealControl = 0d;
+					double minGamma = Double.MAX_VALUE;
+					double maxGamma = 0d;
+					
+					for (Double t : s.stepHandler.quaternionError.keySet()) {
+						final double[] quartenionError = s.stepHandler.quaternionError.get(t);
+						final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
+						final double[] actualControl = s.stepHandler.reactionWheelTorque.get(t);
+						final double[] idealControl = s.stepHandler.reactionWheelDesiredTorque.get(t);
+						final double gamma = s.stepHandler.gama.get(t);
+						
+						// calculate statistics of the norm of state space: 
+						// quaternion (last entry as scalar and adjusted to origin) 
+						// and angular velocity
+						final RealVector stateSpace = new ArrayRealVector(new double[] { 
+								quartenionError[0],
+								quartenionError[1],
+								quartenionError[2], 
+								1-FastMath.abs(quartenionError[3]), // adjusting to origin 0
+								angularVelocityError[0],
+								angularVelocityError[1],
+								angularVelocityError[2]});
+						logger.debug("Norm of StateSpace {} {}",controller, stateSpace.getNorm());
+
+						final RealVector actualControlV = new ArrayRealVector(actualControl); 
+						final RealVector idealControlV = new ArrayRealVector(idealControl); 
+
+						// computing
+						sumNormStateSpace += stateSpace.getNorm();
+						sumNormActualControl += actualControlV.getNorm();
+						sumNormIdealControl += idealControlV.getNorm();
+						
+						// computing gamma
+						if (gamma <= minGamma) {
+							minGamma = gamma;
+						}
+						if (gamma >= maxGamma) {
+							maxGamma = gamma;
+						}
+
+						someValueComputed = true;
+					}
+													
+					optimalStateControl.get(controller).put(++i, new double[] {
+							sumNormStateSpace,
+							sumNormActualControl});
+	
+					optimalIdealActualTorque.get(controller).put(++i, new double[] {
+							sumNormActualControl,
+							sumNormIdealControl});
+
+					minMaxGamma.get(controller).put(++i, new double[] {
+							minGamma,
+							maxGamma});
+				}
+	
+			}
+	
+			if (someValueComputed && plotStatistics) {
+				// computing mean and standard deviation of overall sum by each controller
+				// for each controller
+				final Map<String, Map<Double, double[]>> optimalStateControlForGraph = new TreeMap<String, Map<Double, double[]>>();
+				final Map<String, Map<Double, double[]>> minMaxGammaForGraph = new TreeMap<String, Map<Double, double[]>>();
+	
+				for (String controller : optimalStateControl.keySet()) {
+					final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
+					for (final double i: optimalStateControl.get(controller).keySet()) {
+						final double[] xy = optimalStateControl.get(controller).get(i);
+						statStateSpaceOverall.addValue(xy[0] + xy[1]);
+					}
+					
+					double minGamma = Double.MAX_VALUE;
+					double maxGamma = 0d;
+					for (final double i: minMaxGamma.get(controller).keySet()) {
+						final double[] gamma = minMaxGamma.get(controller).get(i);
+						
+						// computing gamma
+						if (gamma[0] <= minGamma) {
+							minGamma = gamma[0];
+						}
+						if (gamma[1] >= maxGamma) {
+							maxGamma = gamma[1];
+						}
+					}
+					
+					optimalStateControlForGraph.put(controller + " (SUM - Mean=" + statStateSpaceOverall.getMean() + 
+							                                 ",Std=" + statStateSpaceOverall.getStandardDeviation() + 
+							                                 ",Samples="+statStateSpaceOverall.getN()+")", 
+							                                 optimalStateControl.get(controller));
+
+					minMaxGammaForGraph.put(controller + " (Min=" + minGamma + 
+                            ",Max=" + maxGamma + ")", 
+                            minMaxGamma.get(controller));
+				}
+	
+				Plotter.plot2DScatter(optimalStateControlForGraph, "Statistics of Optimality - CONVERGED " + p,
+						new String[] {"sum of Norm of state", "sum of Norm of control"});
+				Plotter.plot2DScatter(minMaxGammaForGraph, "Min Gamma vs Max Gamma - CONVERGED " + p,
+						new String[] {"min Gamma", "max Gamma"});
+				Plotter.plot2DScatter(optimalIdealActualTorque, "Norm of Actual Control vs Norm of Computed Control - CONVERGED " + p,
+						new String[] {"sum of Norm of Actual Control", "sum of Norm of Computed Control"});
+			}
+			logger.info("Results computed {} about sum of norm of state space and sum of norm of control torque (reaction wheel control torque)!", someValueComputed);
+		}
+		
+		logger.info("Polygon enforced {}!", someSimulationPolygon);
 		logger.info("----------------------------");
 	}
 	
