@@ -39,8 +39,8 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	final double UPPER_DEVIATION_PARAMETRIC = +3E-1d; 
 	// it is based on a white noise, so there is no mean to use negative values for magnitude
 	// percent of max torque of reaction wheel
-	final double LOWER_DEVIATION_UNSTRUCTURED = 0d; 
-	final double UPPER_DEVIATION_UNSTRUCTURED = +3E-1d;
+	final double LOWER_DEVIATION_UNSTRUCTURED = 0d;     //-8E-2d; 
+	final double UPPER_DEVIATION_UNSTRUCTURED = +3E-1d; //+8E-2d; 
 			
 	final int NUMBER_OF_DEVIATIONS = 13;  
 

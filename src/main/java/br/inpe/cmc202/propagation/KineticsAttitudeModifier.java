@@ -98,9 +98,14 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 		RealVector externalTorque = new ArrayRealVector(3, 0);
 		if (externalTorqueGeneratorX != null) {
 			externalTorque = new ArrayRealVector(new double[] {
-					externalTorqueGeneratorX.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
-					externalTorqueGeneratorY.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
-					externalTorqueGeneratorZ.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude()});
+					// normal external torque of max magnitude given by 'external Torques Magnitude'
+					//externalTorqueGeneratorX.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
+					//externalTorqueGeneratorY.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
+					//externalTorqueGeneratorZ.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude()});
+					// applying equally, in the three axes, the 'external Torques Magnitude'
+					satellite.getExternalTorquesMagnitude(),
+					satellite.getExternalTorquesMagnitude(),
+					satellite.getExternalTorquesMagnitude()});
 		}
 
 		// magnetorquer
