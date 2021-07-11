@@ -103,6 +103,8 @@ public class StepHandler implements OrekitFixedStepHandler {
 	final Map<Double, Double> conditionNumberA = new TreeMap<Double, Double>();
 	// ADDITIONAL - Count Numerical Errors
 	final Map<Double, Double> countNumericalErrors = new TreeMap<Double, Double>();
+	// ADDITIONAL - Reaction Wheel 'desired' control torque.
+	final Map<Double, double[]> reactionWheelDesiredTorque = new TreeMap<Double, double[]>();
 
 	// to check intervalToStore
 	final long intervalToStore;
@@ -333,6 +335,13 @@ public class StepHandler implements OrekitFixedStepHandler {
 					currentState.getDate().durationFrom(startTime),
 					countNumericalErrors);
 			
+			// reaction wheel 'desired' control torque
+			if (satellite.getSetOfReactionWheels() != null) {
+				reactionWheelDesiredTorque.put(
+						currentState.getDate().durationFrom(startTime),
+						satellite.getSetOfReactionWheels().getState()
+								.getIdealControlTorque().toArray());
+			}
 			
 			lastStoredTime = currentState.getDate().durationFrom(startTime);
 

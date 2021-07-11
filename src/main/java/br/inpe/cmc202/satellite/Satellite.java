@@ -119,6 +119,11 @@ public class Satellite {
 	final private String reactionWheelControllerName;
 	
 	/**
+	 *  To store if the hard-nonlinearities in the reaction wheel is in place.
+	 */
+	final private boolean reactionWheelHardNonlinearities = true;
+	
+	/**
 	 * Constructor.
 	 * 
 	 * @param ecef
@@ -142,7 +147,7 @@ public class Satellite {
 			this.setOfMagnetorquer = null;
 		}
 		this.setOfReactionWheels = new SetOfReactionWheels(
-				satelliteConfiguration);
+				satelliteConfiguration, reactionWheelHardNonlinearities);
 
 		// ANGULAR VELOCITY - REFERENCE
 		// ----------------------------------

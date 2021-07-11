@@ -14,6 +14,10 @@ public class SetOfReactionWheelsState {
 	 */
 	private Vector3D torque_body;
 	/**
+	 * Store the instantaneous torque 'desired' from each reaction wheel.
+	 */
+	private Vector3D torque_desired_body;
+	/**
 	 * Store the angular velocity in each reaction wheel (integrated).
 	 */
 	private Vector3D angularVelocity;
@@ -22,10 +26,11 @@ public class SetOfReactionWheelsState {
 	 */
 	private double inertia;
 
-	public SetOfReactionWheelsState(Vector3D torque_body,
+	public SetOfReactionWheelsState(Vector3D torque_body, Vector3D torque_desired_body,
 			Vector3D angularVelocity, double inertia) {
 		this.angularVelocity = angularVelocity;
 		this.torque_body = torque_body;
+		this.torque_desired_body = torque_desired_body;
 		this.inertia = inertia;
 	}
 
@@ -72,6 +77,15 @@ public class SetOfReactionWheelsState {
 	 */
 	public Vector3D getControlTorque() {
 		return torque_body;
+	}
+
+	/**
+	 * Get the 'desired' control torque of the set of reaction wheels. N.m
+	 * 
+	 * @return
+	 */
+	public Vector3D getIdealControlTorque() {
+		return torque_desired_body;
 	}
 
 }
