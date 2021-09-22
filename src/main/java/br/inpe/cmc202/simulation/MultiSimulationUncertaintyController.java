@@ -37,7 +37,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	// percent
 	final double LOWER_DEVIATION_PARAMETRIC = -3E-1d; 
 	final double UPPER_DEVIATION_PARAMETRIC = +3E-1d; 
-	// it is based on a white noise, so there is no mean to use negative values for magnitude
+	// it is based on a Additive White Gaussian Noise (AWGN), so there is no mean to use negative values for magnitude
 	// percent of max torque of reaction wheel
 	final double LOWER_DEVIATION_UNSTRUCTURED = 0d;     //-8E-2d; 
 	final double UPPER_DEVIATION_UNSTRUCTURED = +3E-1d; //+8E-2d; 
@@ -123,6 +123,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		runSimulations();
 		
 		Map<String, Map<Double, double[][]>> mmap = new TreeMap<String, Map<Double, double[][]>>();
+		Map<String, Double> amap = new TreeMap<String, Double>();
 				
 		for (Double p: mapSimulationsU.keySet()) {
 			final Map<String, List<SimulationController>> mapSimulationsUP = mapSimulationsU.get(p);
@@ -133,7 +134,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 			logger.info("Computed PERTURBATION {}, CONVERGED {} NOT CONVERGED {}!", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
 			
 			Map<String, Map<Double, Double>> domainShape = plotDomainOfAttraction(mapSimulationsUP, "CONVERGED "+p, false);
-			consolidateDomainOfAttraction(mmap, p, domainShape);
+			consolidateDomainOfAttraction(mmap, p, domainShape, amap);
 			
 			//plotDomainOfAttraction(mapSimulationsNotConvergedUP, "NOT CONVERGED "+p, false);
 			
@@ -148,8 +149,10 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 				Map<Double, double[][]> map = mmap.get(controller);
 				Map<String, Map<Double, double[][]>> mmapP = new TreeMap<String, Map<Double, double[][]>>();
 				mmapP.put(controller, map);
+
+				Double area = amap.get(controller);
 				
-				Plotter.plot3DLinesDomainOfAttraction(mmapP, "Domain Of Attraction - Uncertainty - " + controller, false);
+				Plotter.plot3DLinesDomainOfAttraction(mmapP, "Domain Of Attraction - Uncertainty - " + controller + " Area: " + area, false);
 			}
 		}
 		
@@ -201,9 +204,10 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	 * @param mmap - map with all data for the domain of attraction
 	 * @param p - perturbation value
 	 * @param domainShape - shape of the domain of Attraction for a given perturbation
+	 * @param amap - map with areas
 	 */
 	private void consolidateDomainOfAttraction(Map<String, Map<Double, double[][]>> mmap, Double p,
-			Map<String, Map<Double, Double>> domainShape) {
+			Map<String, Map<Double, Double>> domainShape, Map<String, Double> amap) {
 		// consolidating results
 		if (domainShape.size() > 0) {
 			// for each controller
@@ -216,6 +220,17 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 					map = new TreeMap<Double, double[][]>();
 					mmap.put(controller, map);
 				}
+				
+				//calculating area
+				double area = computeArea(controller, data);
+				Double areaS = amap.get(controller);
+				if (areaS == null) {
+					areaS = area;
+					amap.put(controller, areaS);
+				} else {
+					amap.put(controller, areaS + area);
+				}
+				
 				// formatting data for the polygon
 				double[][] xyz = new double[data.size()+2][3] ;
 				int count = 0;

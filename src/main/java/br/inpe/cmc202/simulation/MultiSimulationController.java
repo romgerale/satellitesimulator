@@ -23,6 +23,8 @@ import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.geometry.euclidean.twod.PolygonsSet;
 import org.hipparchus.geometry.euclidean.twod.Vector2D;
 import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.MatrixUtils;
+import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.linear.RealVector;
 import org.hipparchus.random.RandomDataGenerator;
 import org.hipparchus.stat.descriptive.DescriptiveStatistics;
@@ -589,6 +591,111 @@ public class MultiSimulationController implements Runnable {
 			logger.info("Results computed {} about sum of norm of state space and sum of norm of control torque (reaction wheel control torque)!", someValueComputed);
 		}
 		
+		// COMPUTING measures about 
+		// 1)  \int x^TQx + u^TRu
+		// 2)  \int u^TRu (computed/actual)
+		{
+			boolean someValueComputed = false;
+			
+			final RealMatrix Q = MatrixUtils.createRealIdentityMatrix(7);
+			final RealMatrix R = MatrixUtils.createRealIdentityMatrix(3);
+			
+			final Map<String, Map<Double, double[]>> optimalStateControl = new TreeMap<String, Map<Double, double[]>>();
+			final Map<String, Map<Double, double[]>> optimalIdealActualTorque = new TreeMap<String, Map<Double, double[]>>();
+	
+			double maxIntControl = 0;
+			
+			// for each controller
+			for (String controller : mapSimulations.keySet()) {
+				double i = 0d;
+				optimalStateControl.put(controller, new TreeMap<Double, double[]>());
+				optimalIdealActualTorque.put(controller, new TreeMap<Double, double[]>());
+				
+				// for each simulation for a given controller
+				for (SimulationController s : mapSimulations.get(controller)) {
+					double intStateSpace = 0d;
+					double intActualControl = 0d;
+					double intIdealControl = 0d;
+					
+					for (Double t : s.stepHandler.quaternionError.keySet()) {
+						final double[] quartenionError = s.stepHandler.quaternionError.get(t);
+						final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
+						final double[] actualControl = s.stepHandler.reactionWheelTorque.get(t);
+						final double[] idealControl = s.stepHandler.reactionWheelDesiredTorque.get(t);
+						final double step = s.step;
+						
+						// state space: 
+						// quaternion (last entry as scalar and adjusted to origin) 
+						// and angular velocity
+						final RealMatrix stateSpace = MatrixUtils.createColumnRealMatrix(new double[] { 
+								quartenionError[0],
+								quartenionError[1],
+								quartenionError[2], 
+								1-FastMath.abs(quartenionError[3]), // adjusting to origin 0
+								angularVelocityError[0],
+								angularVelocityError[1],
+								angularVelocityError[2]});
+
+						final RealMatrix actualControlV = MatrixUtils.createColumnRealMatrix(actualControl); 
+						final RealMatrix idealControlV = MatrixUtils.createColumnRealMatrix(idealControl); 
+
+						// integrating
+						intStateSpace += stateSpace.transpose().multiply(Q).multiply(stateSpace).scalarMultiply(step).getEntry(0, 0);
+						intActualControl += actualControlV.transpose().multiply(R).multiply(actualControlV).scalarMultiply(step).getEntry(0, 0);
+						intIdealControl += idealControlV.transpose().multiply(R).multiply(idealControlV).scalarMultiply(step).getEntry(0, 0);
+												
+						someValueComputed = true;
+					}
+													
+					optimalStateControl.get(controller).put(++i, new double[] {
+							intStateSpace,
+							intActualControl});
+	
+					optimalIdealActualTorque.get(controller).put(++i, new double[] {
+							intIdealControl,
+							intActualControl});
+					
+					if (intIdealControl > maxIntControl) {
+						maxIntControl = intIdealControl;
+					}
+					if (intActualControl > maxIntControl) {
+						maxIntControl = intActualControl;
+					}
+
+				}
+	
+			}
+	
+			if (someValueComputed && plotStatistics) {
+				// computing mean and standard deviation of overall integral by each controller
+				final Map<String, Map<Double, double[]>> optimalStateControlForGraph = new TreeMap<String, Map<Double, double[]>>();
+				for (String controller : optimalStateControl.keySet()) {
+					final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
+					for (final double i: optimalStateControl.get(controller).keySet()) {
+						final double[] xy = optimalStateControl.get(controller).get(i);
+						statStateSpaceOverall.addValue(xy[0] + xy[1]);
+					}
+					optimalStateControlForGraph.put(controller + " (SUM - Mean=" + statStateSpaceOverall.getMean() + 
+							                                 ",Std=" + statStateSpaceOverall.getStandardDeviation() + 
+							                                 ",Samples="+statStateSpaceOverall.getN()+")", 
+							                                 optimalStateControl.get(controller));
+				}
+
+				//creating the bisectrix for the actual/computed control
+				TreeMap<Double, double[]> bisectrix = new TreeMap<Double, double[]>();
+				optimalIdealActualTorque.put("bisectrix", bisectrix);
+				for (double delta = 0; delta < maxIntControl;  delta+= 0.01d ) {
+					bisectrix.put(delta, new double[] { delta, delta});
+				}
+
+				Plotter.plot2DScatter(optimalStateControlForGraph, "Statistics of Optimality (Integral) - CONVERGED " + p,
+						new String[] {"integral statespace", "integral actual control"});
+				Plotter.plot2DScatter(optimalIdealActualTorque, "Integral of Actual Control vs Integral of Computed Control - CONVERGED " + p,
+						new String[] {"integral computed control", "integral actual control"});
+			}
+			logger.info("Results computed {} about integral of state space and integral of control torque (reaction wheel control torque)!", someValueComputed);
+		}
+		
 		logger.info("Polygon enforced {}!", someSimulationPolygon);
 		logger.info("----------------------------");
 	}
@@ -719,57 +826,9 @@ public class MultiSimulationController implements Runnable {
 					// filtering results
 					if (data.size() > 0) {
 						Map<Double, Double> filteredData = new TreeMap<Double, Double>();
-						final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
-						//final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
-						final double start = x[0];
-						final double end = x[x.length-1];
-						//final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
+						computePolygon(controller, data, filteredData);
+						double area = computeArea(controller, filteredData);
 						
-						// first point "FAKE" reusing y and x=0
-						filteredData.put(0d, data.get(start));
-						
-						//int j = 0;
-						for (int k = 0; k < x.length; ) {
-							//final double startInterval = start + lengthIntervalToAggregate * j;
-							//final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
-							final double endInterval = x[k];
-							final double initialX = x[k];
-							double currentX = initialX;
-							double maxY = 0d;
-							while (currentX <= endInterval) {
-								if (data.get(currentX) > maxY) {
-									maxY = data.get(currentX);
-								}
-								k++;
-								if (k > x.length - 1) break;
-								currentX = x[k];
-							}
-							//j++;
-							if (maxY > 0 ) filteredData.put(x[k-1], maxY);
-						}
-	
-						// last point "FAKE" reusing x and y=0
-						filteredData.put(end+1E-10, 0d);
-						
-						double area = 0d;
-						try {
-							// trying to calculate the area of the polygon
-							// in the reverse order due to the convention of PolygonsSet
-							// "The interior part of the region is on the left side of this path and the exterior is on its right side.
-							Vector2D[] vec = new Vector2D[filteredData.size()+1];
-							int count = filteredData.size();
-							for (double xx : filteredData.keySet()) {
-								vec[count--] = new Vector2D(xx, filteredData.get(xx));	
-							}
-							vec[0] = new Vector2D(0d, 0d);
-							PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
-							area = polygon.getSize();
-							logger.info("Area controller {} = {} ", controller, area);
-						} catch (Exception e) {
-							// numerical problems is possible
-							logger.error("Numerical problems calculating area of the polygon for controller " + controller, e);
-						}
-	
 						domainOfAttractionNormShape.put(controller, filteredData);
 						domainOfAttractionNormShapeForGraph.put(controller + " (area= "+area+")", filteredData);
 					} else {
@@ -794,6 +853,62 @@ public class MultiSimulationController implements Runnable {
 		logger.info("----------------------------");
 		
 		return domainOfAttractionNormShape;
+	}
+
+	protected void computePolygon(final String controller, final Map<Double, Double> data, final Map<Double, Double> filteredData) {
+		final Double[] x = data.keySet().toArray(new Double[data.keySet().size()]);
+		//final int numberOfIntervals = x.length > 100 ? 100 : x.length * 2;
+		final double start = x[0];
+		final double end = x[x.length-1];
+		//final double lengthIntervalToAggregate = (end - start) / ((double)numberOfIntervals);
+		
+		// first point "FAKE" reusing y and x=0
+		filteredData.put(0d, data.get(start));
+		
+		//int j = 0;
+		for (int k = 0; k < x.length; ) {
+			//final double startInterval = start + lengthIntervalToAggregate * j;
+			//final double endInterval = startInterval + (lengthIntervalToAggregate * (j+1));
+			final double endInterval = x[k];
+			final double initialX = x[k];
+			double currentX = initialX;
+			double maxY = 0d;
+			while (currentX <= endInterval) {
+				if (data.get(currentX) > maxY) {
+					maxY = data.get(currentX);
+				}
+				k++;
+				if (k > x.length - 1) break;
+				currentX = x[k];
+			}
+			//j++;
+			if (maxY > 0 ) filteredData.put(x[k-1], maxY);
+		}
+
+		// last point "FAKE" reusing x and y=0
+		filteredData.put(end+1E-10, 0d);
+	}
+
+	protected double computeArea(final String controller, final Map<Double, Double> filteredData) {
+		double area = 0d;
+		try {
+			// trying to calculate the area of the polygon
+			// in the reverse order due to the convention of PolygonsSet
+			// "The interior part of the region is on the left side of this path and the exterior is on its right side.
+			Vector2D[] vec = new Vector2D[filteredData.size()+1];
+			int count = filteredData.size();
+			for (double xx : filteredData.keySet()) {
+				vec[count--] = new Vector2D(xx, filteredData.get(xx));	
+			}
+			vec[0] = new Vector2D(0d, 0d);
+			PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
+			area = polygon.getSize();
+			logger.info("Area controller {} = {} ", controller, area);
+		} catch (Exception e) {
+			// numerical problems is possible
+			logger.error("Numerical problems calculating area of the polygon for controller " + controller, e);
+		}
+		return area;
 	}
 
 	//****
