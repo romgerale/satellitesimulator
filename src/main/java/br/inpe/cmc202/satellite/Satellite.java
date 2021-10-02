@@ -101,13 +101,13 @@ public class Satellite {
 	private Rotation targetQuaternion = null;
 
 	/**
-	 * It is used to indicate that external torques must be accounted using a
-	 * random variable with: mean 0, variance 1 and the magnitude defined.
+	 * It is used to indicate that external torques must be accounted.
 	 * 
 	 * It is used in the kinetics.
 	 */
-	private double externalTorquesMagnitude = 0;
-
+	private double externalTorquesMagnitude = 0d;
+	private Environment environment;
+	
 	/**
 	 * It is used in the SDRE Controllers parametrized A(x,\alpha)
 	 */
@@ -350,6 +350,7 @@ public class Satellite {
 		} else {
 			this.setOfMagnetorquerController = new SetOfMagnetorquersController();
 		}
+		
 	}
 
 	/**
@@ -370,6 +371,9 @@ public class Satellite {
 				satelliteProperties, inertiaTensor);
 		this.alpha1 = alpha1;
 		this.externalTorquesMagnitude = externalTorquesMagnitude;
+
+		// prepare external torques
+		this.environment = new Environment(externalTorquesMagnitude); 
 	}
 
 	/**
@@ -608,14 +612,26 @@ public class Satellite {
 	public void setSpacecraftState(SpacecraftState spacecraftState) {
 		this.spacecraftState = spacecraftState;
 	}
-
+	
+	
 	/**
-	 * @return the externalTorquesMagnitude
+	 * Returns the precomputed external torque and it increments the counter for the next iteration.
+	 * 
+	 * @return the externalTorque
 	 */
-	public double getExternalTorquesMagnitude() {
-		return externalTorquesMagnitude;
+	public RealVector getCurrentAndPrepareNextExternalTorque() {
+		return environment.getCurrentAndPrepareNextExternalTorque(externalTorquesMagnitude);
 	}
 
+	/**
+	 * Return the precomputed external torque for current iteration.
+	 * 
+	 * @return the externalTorque
+	 */
+	public RealVector getCurrentExternalTorque() {
+		return environment.getCurrentExternalTorque(externalTorquesMagnitude);
+	}
+	
 	/**
 	 * @return the alpha1
 	 */

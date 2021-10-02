@@ -4,7 +4,6 @@ import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.geometry.euclidean.threed.Vector3DComplement;
 import org.hipparchus.linear.ArrayRealVector;
 import org.hipparchus.linear.RealVector;
-import org.hipparchus.random.RandomDataGenerator;
 import org.orekit.attitudes.Attitude;
 import org.orekit.attitudes.AttitudeProvider;
 import org.orekit.attitudes.AttitudeProviderModifier;
@@ -35,10 +34,6 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 	final private KinematicsAttitudeProvider underlyingAttitudeProvider;
 	final private Satellite satellite;
 
-	final private RandomDataGenerator externalTorqueGeneratorX;
-	final private RandomDataGenerator externalTorqueGeneratorY;
-	final private RandomDataGenerator externalTorqueGeneratorZ;
-
 	/**
 	 * @param attitudeProvider
 	 * @param satellite
@@ -56,16 +51,6 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 
 		this.underlyingAttitudeProvider = (KinematicsAttitudeProvider) attitudeProvider;
 		this.satellite = satellite;
-
-		if (this.satellite.getExternalTorquesMagnitude() != 0) {
-			externalTorqueGeneratorX = new RandomDataGenerator();
-			externalTorqueGeneratorY = new RandomDataGenerator();
-			externalTorqueGeneratorZ = new RandomDataGenerator();
-		} else {
-			externalTorqueGeneratorX = null;
-			externalTorqueGeneratorY = null;
-			externalTorqueGeneratorZ = null;
-		}
 
 	}
 
@@ -95,23 +80,7 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 				previousAttitude.getRotationAcceleration().toArray());
 
 		// external torque
-		RealVector externalTorque = new ArrayRealVector(3, 0);
-		if (externalTorqueGeneratorX != null) {
-			externalTorque = new ArrayRealVector(new double[] {
-					// normal external torque of max magnitude given by 'external Torques Magnitude'
-					//externalTorqueGeneratorX.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
-					//externalTorqueGeneratorY.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude(),
-					//externalTorqueGeneratorZ.nextNormal(0d,1d) * satellite.getExternalTorquesMagnitude()});
-					// 0.33 to allow at max 1 externalTorqueMagnitude
-					externalTorqueGeneratorX.nextNormal(0d,0.33d) * satellite.getExternalTorquesMagnitude(),
-					externalTorqueGeneratorY.nextNormal(0d,0.33d) * satellite.getExternalTorquesMagnitude(),
-					externalTorqueGeneratorZ.nextNormal(0d,0.33d) * satellite.getExternalTorquesMagnitude()});
-					// applying equally, in the three axes, the 'external Torques Magnitude'
-					//satellite.getExternalTorquesMagnitude(),
-					//satellite.getExternalTorquesMagnitude(),
-					//satellite.getExternalTorquesMagnitude()});
-			//logger.info("external torque: {}", externalTorque);
-		}
+		RealVector externalTorque = this.satellite.getCurrentAndPrepareNextExternalTorque();
 
 		// magnetorquer
 		// and external torques in the center of mass
