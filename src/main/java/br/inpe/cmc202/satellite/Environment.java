@@ -8,6 +8,10 @@ import java.util.Map;
 import org.hipparchus.linear.ArrayRealVector;
 import org.hipparchus.linear.RealVector;
 import org.hipparchus.random.RandomDataGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import br.inpe.cmc202.simulation.plotter.Plotter;
 
 /**
  * 
@@ -24,7 +28,7 @@ public class Environment {
 	 * It is used to share the same data for all satellites with a given
 	 * externalTorqueMagnitude.
 	 */
-	private static Map<Double, List<RealVector>> externalTorques;
+	private static final Map<Double, List<RealVector>> externalTorques = new HashMap<Double, List<RealVector>>();
 
 	/**
 	 * It controls the usage of procomputed data.
@@ -32,6 +36,8 @@ public class Environment {
 	private int currentIndexExternalTorque = 0;
 
 	private final static int MAX_DATA = 80000;
+
+	final private Logger logger = LoggerFactory.getLogger(Environment.class);
 
 	/**
 	 * Constructor for Environment.
@@ -46,39 +52,42 @@ public class Environment {
 	 * Prepare the external torques for the satellites. It prepares MAX_DATA real
 	 * vectors.
 	 */
-	private synchronized void prepareExternalTorques(double externalTorquesMagnitude) {
-		if (externalTorques == null) {
-			externalTorques = new HashMap<Double, List<RealVector>>();
-		}
-		if (externalTorquesMagnitude != 0 && externalTorques.get(externalTorquesMagnitude) == null) {
-			List<RealVector> iExternalTorques = new ArrayList<RealVector>();
-			externalTorques.put(externalTorquesMagnitude, iExternalTorques);
-			RandomDataGenerator externalTorqueGeneratorX = new RandomDataGenerator();
-			RandomDataGenerator externalTorqueGeneratorY = new RandomDataGenerator();
-			RandomDataGenerator externalTorqueGeneratorZ = new RandomDataGenerator();
+	private void prepareExternalTorques(double externalTorquesMagnitude) {
+		synchronized(externalTorques) {
+			if (externalTorquesMagnitude != 0 && externalTorques.get(externalTorquesMagnitude) == null) {
+				logger.error("Computing external torque for magnitude {} ...", externalTorquesMagnitude);
+				List<RealVector> iExternalTorques = new ArrayList<RealVector>();
+				externalTorques.put(externalTorquesMagnitude, iExternalTorques);
+				RandomDataGenerator externalTorqueGeneratorX = new RandomDataGenerator();
+				RandomDataGenerator externalTorqueGeneratorY = new RandomDataGenerator();
+				RandomDataGenerator externalTorqueGeneratorZ = new RandomDataGenerator();
 
-			// computing points
-			for (int i = 0; i < MAX_DATA; i++) {
-				RealVector externalTorque = new ArrayRealVector(new double[] {
-						// normal external torque of max magnitude given by 'external Torques Magnitude'
-						// externalTorqueGeneratorX.nextNormal(0d,1d) *
-						// satellite.getExternalTorquesMagnitude(),
-						// externalTorqueGeneratorY.nextNormal(0d,1d) *
-						// satellite.getExternalTorquesMagnitude(),
-						// externalTorqueGeneratorZ.nextNormal(0d,1d) *
-						// satellite.getExternalTorquesMagnitude()});
+				// it is based on a Additive White Gaussian Noise (AWGN)
+				// 0.33 (3 sigmas, 99.7%) to strive for max 1 externalTorqueMagnitude
+				// 0.25 (4 sigmas, 99.9937%) to strive for max 1 externalTorqueMagnitude
+				// 0.20 (5 sigmas, 99.99943%) to strive for max 1 externalTorqueMagnitude
+				// 0.16 (6 sigmas, 99.999998%) to strive for max 1 externalTorqueMagnitude
+				double sigma = 6d;
 
-						// it is based on a Additive White Gaussian Noise (AWGN)
-						// 0.33 to allow at max 1 externalTorqueMagnitude
-						externalTorqueGeneratorX.nextNormal(0d, 0.33d) * externalTorquesMagnitude,
-						externalTorqueGeneratorY.nextNormal(0d, 0.33d) * externalTorquesMagnitude,
-						externalTorqueGeneratorZ.nextNormal(0d, 0.33d) * externalTorquesMagnitude });
+				// for inspection of perturbed torque
+				final Map<Double, double[]> torques = new HashMap<Double, double[]>();
 
-				// applying equally, in the three axes, the 'external Torques Magnitude'
-				// satellite.getExternalTorquesMagnitude(),
-				// satellite.getExternalTorquesMagnitude(),
-				// satellite.getExternalTorquesMagnitude()});
-				iExternalTorques.add(externalTorque);
+				// computing points
+				for (int i = 0; i < MAX_DATA; i++) {
+					RealVector externalTorque = new ArrayRealVector(new double[] {
+							externalTorqueGeneratorX.nextNormal(0d, externalTorquesMagnitude / sigma),
+							externalTorqueGeneratorY.nextNormal(0d, externalTorquesMagnitude / sigma),
+							externalTorqueGeneratorZ.nextNormal(0d, externalTorquesMagnitude / sigma)});
+	
+					iExternalTorques.add(externalTorque);
+					torques.put(Double.valueOf(i), externalTorque.toArray());
+					
+				}
+
+				logger.error("Computed external torque for magnitude {} using {} sigmas!", externalTorquesMagnitude, sigma);
+
+				// plotting external torque
+				Plotter.plot3DScatter(torques, "externalTorquesMagnitude" + externalTorquesMagnitude);
 			}
 		}
 	}
@@ -91,13 +100,13 @@ public class Environment {
 	 */
 	public RealVector getCurrentAndPrepareNextExternalTorque(double externalTorquesMagnitude) {
 		RealVector toRet = null;
-		if (externalTorques.get(externalTorquesMagnitude) == null) {
+		List<RealVector> iExternalTorques = externalTorques.get(externalTorquesMagnitude);
+		if (iExternalTorques == null) {
 			toRet = new ArrayRealVector(3, 0);
 		} else {
-			List<RealVector> iExternalTorques = externalTorques.get(externalTorquesMagnitude);
 			if (currentIndexExternalTorque >= iExternalTorques.size()) {
 				throw new RuntimeException(
-						"There is external torques computed, however, the simulation time is too big for the computed data!");
+						"There are external torques computed, however, the simulation time is too big for the computed data!");
 			}
 			toRet = iExternalTorques.get(currentIndexExternalTorque);
 			currentIndexExternalTorque++;
@@ -112,13 +121,13 @@ public class Environment {
 	 */
 	public RealVector getCurrentExternalTorque(double externalTorquesMagnitude) {
 		RealVector toRet = null;
-		if (externalTorques.get(externalTorquesMagnitude) == null) {
+		List<RealVector> iExternalTorques = externalTorques.get(externalTorquesMagnitude);
+		if (iExternalTorques == null) {
 			toRet = new ArrayRealVector(3, 0);
 		} else {
-			List<RealVector> iExternalTorques = externalTorques.get(externalTorquesMagnitude);
 			if (currentIndexExternalTorque >= iExternalTorques.size()) {
 				throw new RuntimeException(
-						"There is external torques computed, however, the simulation time is too big for the computed data!");
+						"There are external torques computed, however, the simulation time is too big for the computed data!");
 			}
 			toRet = iExternalTorques.get(currentIndexExternalTorque);
 		}
