@@ -5,6 +5,7 @@ import java.util.Properties;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.DecompositionSolver;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
@@ -27,6 +28,8 @@ import br.inpe.cmc202.satellite.controllers.lqr.ProportionalLinearQuaternionPart
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearEulerAnglesSDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearMRPSDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearQuaternionFullSDREController;
+import br.inpe.cmc202.satellite.controllers.sdre.hinfinity.ProportionalNonLinearMRPSDREHInfinityController;
+import br.inpe.cmc202.satellite.controllers.sdre.hinfinity.ProportionalNonLinearQuaternionFullSDREHInfinityController;
 import br.inpe.cmc202.satellite.sensors.Gyroscope;
 import br.inpe.cmc202.satellite.sensors.Magnetometer;
 import br.inpe.cmc202.satellite.sensors.SetOfSunSensors;
@@ -98,18 +101,28 @@ public class Satellite {
 	private Rotation targetQuaternion = null;
 
 	/**
-	 * It is used to indicate that external torques must be accounted using a
-	 * random variable with: mean 0, variance 1 and the magnitude defined.
+	 * It is used to indicate that external torques must be accounted.
 	 * 
 	 * It is used in the kinetics.
 	 */
-	private double externalTorquesMagnitude = 0;
-
+	private double externalTorquesMagnitude = 0d;
+	private Environment environment;
+	
 	/**
 	 * It is used in the SDRE Controllers parametrized A(x,\alpha)
 	 */
 	private double alpha1 = 0d;
 
+	/**
+	 *  To store the controllerName.
+	 */
+	final private String reactionWheelControllerName;
+	
+	/**
+	 *  To store if the hard-nonlinearities in the reaction wheel is in place.
+	 */
+	final private boolean reactionWheelHardNonlinearities = true;
+	
 	/**
 	 * Constructor.
 	 * 
@@ -134,7 +147,7 @@ public class Satellite {
 			this.setOfMagnetorquer = null;
 		}
 		this.setOfReactionWheels = new SetOfReactionWheels(
-				satelliteConfiguration);
+				satelliteConfiguration, reactionWheelHardNonlinearities);
 
 		// ANGULAR VELOCITY - REFERENCE
 		// ----------------------------------
@@ -264,6 +277,7 @@ public class Satellite {
 		// ********************
 
 		// controller
+		this.reactionWheelControllerName = reactionWheelControllerName;
 		switch (reactionWheelControllerName) {
 		case "ProportionalDerivativeLinearSunVectorController":
 			this.controller = new ProportionalDerivativeLinearSunVectorController();
@@ -318,6 +332,15 @@ public class Satellite {
 			this.controller = new ProportionalNonLinearMRPSDREController(this,
 					"ALPHA");
 			break;
+		case "ProportionalNonLinearQuaternionFullSDREHInfinityController":
+			this.controller = new ProportionalNonLinearQuaternionFullSDREHInfinityController(
+				this, "GIBBS");
+			break;
+		case "ProportionalNonLinearMRPSDREHInfinityController":
+			this.controller = new ProportionalNonLinearMRPSDREHInfinityController(this,
+				"FIRST");
+			break;
+			
 		default:
 			this.controller = new NopeController();
 		}
@@ -327,6 +350,7 @@ public class Satellite {
 		} else {
 			this.setOfMagnetorquerController = new SetOfMagnetorquersController();
 		}
+		
 	}
 
 	/**
@@ -347,6 +371,9 @@ public class Satellite {
 				satelliteProperties, inertiaTensor);
 		this.alpha1 = alpha1;
 		this.externalTorquesMagnitude = externalTorquesMagnitude;
+
+		// prepare external torques
+		this.environment = new Environment(externalTorquesMagnitude); 
 	}
 
 	/**
@@ -585,14 +612,26 @@ public class Satellite {
 	public void setSpacecraftState(SpacecraftState spacecraftState) {
 		this.spacecraftState = spacecraftState;
 	}
-
+	
+	
 	/**
-	 * @return the externalTorquesMagnitude
+	 * Returns the precomputed external torque and it increments the counter for the next iteration.
+	 * 
+	 * @return the externalTorque
 	 */
-	public double getExternalTorquesMagnitude() {
-		return externalTorquesMagnitude;
+	public RealVector getCurrentAndPrepareNextExternalTorque() {
+		return environment.getCurrentAndPrepareNextExternalTorque(externalTorquesMagnitude);
 	}
 
+	/**
+	 * Return the precomputed external torque for current iteration.
+	 * 
+	 * @return the externalTorque
+	 */
+	public RealVector getCurrentExternalTorque() {
+		return environment.getCurrentExternalTorque(externalTorquesMagnitude);
+	}
+	
 	/**
 	 * @return the alpha1
 	 */
@@ -613,9 +652,100 @@ public class Satellite {
 				+ ",\n setOfMagnetorquerController="
 				+ setOfMagnetorquerController
 				+ ",\n angularVelocityReference_body="
-				+ angularVelocityReference_body + ",\n sunReference_body="
-				+ sunReference_body + ",\n externalTorquesMagnitude="
-				+ externalTorquesMagnitude + ",\n alpha1=" + alpha1 + "]";
+				+ angularVelocityReference_body
+				+ ",\n sunReference_body="
+				+ sunReference_body
+				+ ",\n externalTorquesMagnitude="
+				+ externalTorquesMagnitude
+				+ ",\n alpha1="
+				+ alpha1 
+				+ ",\n modeUsingAttitude="
+				+ modeUsingAttitude 
+				+ ",\n reactionWheelControllerName="
+				+ reactionWheelControllerName 
+				+ "\n, reactionWheelHardNonlinearities=" 
+				+ reactionWheelHardNonlinearities + "]";
+	}
+	
+	
+	/**
+	 * @return the maximum angular velocity controllable by the reaction wheels (individually)
+	 */
+	public RealVector getMaximumAngularVelocityControllableByReactionWheels() {
+		
+		// calculating maximum angular momentum of the reaction wheels
+		final SetOfReactionWheels set = this.getSetOfReactionWheels();
+		final RealMatrix inertiaSet = set.getInertiaTensorContribution();
+		final RealMatrix maxAngularVelocity = MatrixUtils
+				.createRealMatrix(new double[][] { { set.getMAX_ANGULAR_VELOCITY() }, { set.getMAX_ANGULAR_VELOCITY() },
+						{ set.getMAX_ANGULAR_VELOCITY() } });
+		final RealMatrix maxActuatorsAngularMomentum = inertiaSet.multiply(maxAngularVelocity);
+
+		
+		// calculating max angular velocity = Iw = L
+		final RealMatrix inertia = this.getI();
+		final DecompositionSolver solver = new LUDecomposition(inertia).getSolver();
+		final RealMatrix maxAngVelocity = solver.solve(maxActuatorsAngularMomentum);
+
+		return new ArrayRealVector(maxAngVelocity.getColumn(0));
 	}
 
+	/**
+	 * Set mode used for attitude to compute the sun error
+	 * false = step by step difference of vectors 
+	 * true = quaternion error
+	 */
+	public void setModeUsingAttitude(boolean mode) {
+		this.modeUsingAttitude = mode;
+	}
+	
+	/**
+	 * Returns the controller name in the satellite.
+	 */
+	public String getReactionWheelControllerName() {
+		return this.reactionWheelControllerName;
+	}
+
+
+	/**
+	 * Satellites are structurally equal if the inertia tensor, inertia tensor with parametric uncertainty, 
+	 * alpha1, externalTorquesMagnitude, mode and reaction controller name are the same.
+	 * 
+	 */
+	public boolean equalsStructurallly(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Satellite other = (Satellite) obj;
+		if (I == null) {
+			if (other.I != null)
+				return false;
+		} else if (!I.equals(other.I))
+			return false;
+		if (I_mu == null) {
+			if (other.I_mu != null)
+				return false;
+		} else if (!I_mu.equals(other.I_mu))
+			return false;
+		if (Double.doubleToLongBits(alpha1) != Double.doubleToLongBits(other.alpha1))
+			return false;
+		if (Double.doubleToLongBits(externalTorquesMagnitude) != Double
+				.doubleToLongBits(other.externalTorquesMagnitude))
+			return false;
+		if (modeUsingAttitude != other.modeUsingAttitude)
+			return false;
+		if (reactionWheelControllerName == null) {
+			if (other.reactionWheelControllerName != null)
+				return false;
+		} else if (!reactionWheelControllerName.equals(other.reactionWheelControllerName))
+			return false;
+		if (reactionWheelHardNonlinearities != other.reactionWheelHardNonlinearities)
+			return false;
+		return true;
+	}
+	
+	
 }

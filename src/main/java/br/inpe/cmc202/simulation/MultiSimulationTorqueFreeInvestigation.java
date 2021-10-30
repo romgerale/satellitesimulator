@@ -3,17 +3,11 @@ package br.inpe.cmc202.simulation;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
@@ -31,17 +25,13 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * @author alessandro.g.romero
  * 
  */
-public class MultiSimulationTorqueFreeInvestigation implements Runnable {
+public class MultiSimulationTorqueFreeInvestigation extends MultiSimulationController {
 
 	// STATESPACE
 	private static final String CONTROLLER = "NopeController";
 
 	static final private Logger logger = LoggerFactory
 			.getLogger(MultiSimulationTorqueFreeInvestigation.class);
-
-	// FOR STORING
-	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
-	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
 
 	/**
 	 * @param numberOfSimulations
@@ -103,53 +93,7 @@ public class MultiSimulationTorqueFreeInvestigation implements Runnable {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.lang.Runnable#run()
-	 */
-	public void run() {
-		long start = System.currentTimeMillis();
-		final int numberOfProcessors = Runtime.getRuntime()
-				.availableProcessors();
-
-		// Get the ThreadFactory implementation to use
-		ThreadFactory threadFactory = Executors.defaultThreadFactory();
-		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(
-				numberOfProcessors, numberOfProcessors, 0, TimeUnit.SECONDS,
-				new LinkedBlockingQueue<Runnable>(), threadFactory);
-
-		// starting threads
-		for (SimulationController s : listSimulations) {
-			executorPool.execute(s);
-		}
-
-		logger.info(
-				"Total of {} simulations are scheduled to run in {} threads",
-				listSimulations.size(), executorPool.getActiveCount());
-
-		// joinning all threads
-		executorPool.shutdown();
-		while (!executorPool.isTerminated()) {
-			try {
-				Thread.sleep(10000);
-				logger.info(
-						"{} simulations concluded from the total of {} in {} s",
-						executorPool.getCompletedTaskCount(),
-						listSimulations.size(),
-						(System.currentTimeMillis() - start) / 1000d);
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Simulation was interrupted", e);
-			}
-		}
-
-		logger.info("**********************************");
-		logger.info("{} simulations concluded from the total of {} in {} s",
-				executorPool.getCompletedTaskCount(), listSimulations.size(),
-				(System.currentTimeMillis() - start) / 1000d);
-		logger.info("**********************************");
-
+	protected void plotSimulations() {
 		// plotting
 		NumberFormat numberFormatter = new DecimalFormat("##.000000");
 		for (String key : mapSimulations.keySet()) {
@@ -269,8 +213,8 @@ public class MultiSimulationTorqueFreeInvestigation implements Runnable {
 		logger.info("**********************************");
 
 		if (args.length > 0) {
-			Integer numberOfSimulations = new Integer(args[0]);
-			Integer stable = new Integer(args[1]);
+			Integer numberOfSimulations = Integer.parseInt(args[0]);
+			Integer stable = Integer.parseInt(args[1]);
 			new MultiSimulationTorqueFreeInvestigation(numberOfSimulations, stable)
 					.run();
 		} else {

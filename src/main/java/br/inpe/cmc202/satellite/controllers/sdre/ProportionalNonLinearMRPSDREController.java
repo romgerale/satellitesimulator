@@ -26,7 +26,7 @@ public class ProportionalNonLinearMRPSDREController extends
 	final private Logger logger = LoggerFactory
 			.getLogger(ProportionalNonLinearMRPSDREController.class);
 
-	final private String algebraicEquation;
+	final protected String algebraicEquation;
 
 	/**
 	 * Constructor.
@@ -107,17 +107,17 @@ public class ProportionalNonLinearMRPSDREController extends
 		}
 
 		default:
-			throw new RuntimeException("Approach for kinemtics is not defined");
+			throw new RuntimeException("Approach for kinematics is not defined");
 		}
 
 		if (logger.isTraceEnabled()) {
 			logger.trace("-- A {}", f.format(A));
 		}
 
-		checkPointwiseControlability(A, B);
-		checkPointwiseObservability(A, Q_sqrt);
-
 		try {
+			checkPointwiseControlability(A, B);
+			checkPointwiseObservability(A, Q_sqrt);
+
 			// solving Riccati
 			RiccatiEquationSolver riccatiSolver = new RiccatiEquationSolverImpl(
 					A, B, Q, R);
@@ -129,6 +129,7 @@ public class ProportionalNonLinearMRPSDREController extends
 			// u = -Kx
 			return new Vector3D(K.operate(X).mapMultiply(-1).toArray());
 		} catch (RuntimeException re) {
+			this.countNumericalErrors++;
 			// if a numerical error occurs in the SDRE the default control is 0
 			logger.warn(
 					"Unexpected numerical error was occurred in the SDRE solving. Assuming control ZERO.",
@@ -147,7 +148,7 @@ public class ProportionalNonLinearMRPSDREController extends
 	 * @param mrp2matrix
 	 * @return
 	 */
-	private RealMatrix computeA1(Vector3D angularVelocity,
+	protected RealMatrix computeA1(Vector3D angularVelocity,
 			final RealMatrix angularVelocity2times,
 			final RealMatrix angularVelocity2transpose,
 			final RealMatrix mrp2transpose, final RealMatrix mrp2matrix) {
@@ -190,7 +191,7 @@ public class ProportionalNonLinearMRPSDREController extends
 	 * @param mrp2times
 	 * @return
 	 */
-	private RealMatrix computeA2(Vector3D angularVelocity,
+	protected RealMatrix computeA2(Vector3D angularVelocity,
 			final RealMatrix angularVelocity2transpose,
 			final RealMatrix mrp2transpose, final RealMatrix mrp2matrix,
 			final RealMatrix mrp2times) {

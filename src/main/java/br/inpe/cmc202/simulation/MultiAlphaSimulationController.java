@@ -3,15 +3,9 @@ package br.inpe.cmc202.simulation;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.hipparchus.util.FastMath;
 import org.orekit.errors.OrekitException;
@@ -26,19 +20,15 @@ import br.inpe.cmc202.simulation.plotter.Plotter;
  * with different alphas defined for a given Monte Carlo perturbation model.
  * 
  * @author alessandro.g.romero
- * 
+ * @deprecated
  */
-public class MultiAlphaSimulationController implements Runnable {
+public class MultiAlphaSimulationController extends MultiSimulationController {
 
 	private static final String CONTROLLER1 = "ProportionalNonLinearMRPSDREController_ALPHA";
 	//private static final String CONTROLLER1 = "ProportionalNonLinearQuaternionSDREController_ALPHA";
 
 	static final private Logger logger = LoggerFactory
 			.getLogger(MultiAlphaSimulationController.class);
-
-	// FOR STORING
-	final List<SimulationController> listSimulations = new ArrayList<SimulationController>();
-	final Map<String, List<SimulationController>> mapSimulations = new HashMap<String, List<SimulationController>>();
 
 	/**
 	 * @param monteCarlo
@@ -86,51 +76,7 @@ public class MultiAlphaSimulationController implements Runnable {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.lang.Runnable#run()
-	 */
-	public void run() {
-		long start = System.currentTimeMillis();
-
-		// Get the ThreadFactory implementation to use
-		ThreadFactory threadFactory = Executors.defaultThreadFactory();
-		// creating the ThreadPoolExecutor
-		ThreadPoolExecutor executorPool = new ThreadPoolExecutor(3, 3, 0,
-				TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
-				threadFactory);
-
-		// starting threads
-		for (SimulationController s : listSimulations) {
-			executorPool.execute(s);
-		}
-
-		logger.info(
-				"Total of {} simulations are scheduled to run in {} threads",
-				listSimulations.size(), executorPool.getActiveCount());
-
-		// joinning all threads
-		executorPool.shutdown();
-		while (!executorPool.isTerminated()) {
-			try {
-				Thread.sleep(10000);
-				logger.info(
-						"{} simulations concluded from the total of {} in {} s",
-						executorPool.getCompletedTaskCount(),
-						listSimulations.size(),
-						(System.currentTimeMillis() - start) / 1000d);
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Simulation was interrupted", e);
-			}
-		}
-
-		logger.info("**********************************");
-		logger.info("{} simulations concluded from the total of {} in {} s",
-				executorPool.getCompletedTaskCount(), listSimulations.size(),
-				(System.currentTimeMillis() - start) / 1000d);
-		logger.info("**********************************");
-
+	protected void plotSimulations() {
 		// plotting
 		Map<String, Map<Double, Double>> detControllability = new TreeMap<String, Map<Double, Double>>();
 		NumberFormat numberFormatter = new DecimalFormat("#0.00");
@@ -160,7 +106,7 @@ public class MultiAlphaSimulationController implements Runnable {
 		logger.info("**********************************");
 
 		if (args.length > 0) {
-			Integer numberOfSimulations = new Integer(args[0]);
+			Integer numberOfSimulations = Integer.parseInt(args[0]);
 			new MultiAlphaSimulationController(numberOfSimulations).run();
 		} else {
 			throw new RuntimeException(

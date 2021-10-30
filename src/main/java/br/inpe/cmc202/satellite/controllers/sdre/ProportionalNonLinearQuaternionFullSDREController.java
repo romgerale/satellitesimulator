@@ -27,7 +27,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 	final private Logger logger = LoggerFactory
 			.getLogger(ProportionalNonLinearQuaternionFullSDREController.class);
 
-	final private String kinematicsDefinition;
+	final protected String kinematicsDefinition;
 
 	/**
 	 * Constructor.
@@ -95,7 +95,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 			logger.debug(
 					"Too much close to the origin (Vector Norm ||X|| {}). Assuming control ZERO.",
 					X.getNorm());
-			return new Vector3D(0, 0, 0);
+		//	return new Vector3D(0, 0, 0);
 		}
 
 		// important define the formulation for kinematics
@@ -106,10 +106,10 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 			logger.trace("-- A {}", f.format(A));
 		}
 
-		checkPointwiseControlability(A, B);
-		checkPointwiseObservability(A, Q_sqrt);
-
 		try {
+			checkPointwiseControlability(A, B);
+			checkPointwiseObservability(A, Q_sqrt);
+
 			// solving Riccati
 			RiccatiEquationSolver riccatiSolver = new RiccatiEquationSolverImpl(
 					A, B, Q, R);
@@ -121,6 +121,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 			// u = -Kx
 			return new Vector3D(K.operate(X).mapMultiply(-1).toArray());
 		} catch (RuntimeException re) {
+			this.countNumericalErrors++;
 			// if a numerical error occurs in the SDRE the default control is 0
 			logger.warn(
 					"Unexpected numerical error was occurred in the SDRE solving. Assuming control ZERO.",
@@ -138,7 +139,7 @@ public class ProportionalNonLinearQuaternionFullSDREController extends
 	 * @param kinematicsEquation
 	 * @return
 	 */
-	private RealMatrix computeA(Rotation errorQuaternion,
+	protected RealMatrix computeA(Rotation errorQuaternion,
 			Vector3D angularVelocity, String kinematicsEquation) {
 		RealMatrix A = MatrixUtils.createRealMatrix(7, 7);
 

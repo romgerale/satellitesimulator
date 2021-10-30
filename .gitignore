@@ -24,3 +24,9 @@ hs_err_pid*
 
 # Maven build
 target/
+bin/
+
+# Eclispe files
+.classpath
+.project
+.settings/

@@ -3,12 +3,12 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>br.inpe.pos.cmc204</groupId>
 	<artifactId>satellitesimulator</artifactId>
-	<version>0.1.0-SNAPSHOT</version>
+	<version>0.2.1-SNAPSHOT</version>
 	<name>SatelliteSimulator</name>
 
 	<properties>
-		<maven.compiler.source>1.7</maven.compiler.source>
-		<maven.compiler.target>1.7</maven.compiler.target>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
 	</properties>
 
 	<dependencies>
@@ -44,40 +44,41 @@
 			</exclusions>
 		</dependency>
 		<!-- BEGIN using the last version of Hipparchus -->
+		<!--  for snapshots https://packages.orekit.org/#browse/browse:maven-snapshots -->
 		<dependency>
 			<artifactId>hipparchus-core</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-fitting</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-geometry</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-ode</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-optim</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-stat</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-filtering</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.3</version>
+			<version>1.9-SNAPSHOT</version>
 		</dependency>
 		<!-- END using the last version of Hipparchus -->
 		<dependency>
@@ -103,12 +104,12 @@
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-slf4j-impl</artifactId>
-			<version>2.10.0</version>
+			<version>2.14.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-core</artifactId>
-			<version>2.10.0</version>
+			<version>2.13.2</version>
 			<scope>compile</scope>
 		</dependency>
 		<!-- TEMPORARY - FOR KALMAN FILTER -->
@@ -120,7 +121,7 @@
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.12</version>
+			<version>4.13.1</version>
 			<scope>test</scope>
 		</dependency>
 

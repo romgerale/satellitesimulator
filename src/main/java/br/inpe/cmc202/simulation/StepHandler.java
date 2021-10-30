@@ -22,6 +22,8 @@ import org.slf4j.MDC;
 import br.inpe.cmc202.orbit.KeplerianOrbitAroundEarth;
 import br.inpe.cmc202.satellite.Satellite;
 import br.inpe.cmc202.satellite.controllers.BaseController;
+import br.inpe.cmc202.satellite.controllers.sdre.hinfinity.ProportionalNonLinearMRPSDREHInfinityController;
+import br.inpe.cmc202.satellite.controllers.sdre.hinfinity.ProportionalNonLinearQuaternionFullSDREHInfinityController;
 import br.inpe.cmc202.simulation.animation.SatelliteAttitudeVisualizer;
 import br.inpe.cmc202.simulation.plotter.Plotter;
 
@@ -95,6 +97,16 @@ public class StepHandler implements OrekitFixedStepHandler {
 	// ADDITIONAL - Poincare Section
 	final Map<Double, Double> poincareSection = new TreeMap<Double, Double>();
 	private double lastQN = 0d;
+	// ADDITIONAL - Gama
+	final Map<Double, Double> gama = new TreeMap<Double, Double>();
+	// ADDITIONAL - Condition Number of A
+	final Map<Double, Double> conditionNumberA = new TreeMap<Double, Double>();
+	// ADDITIONAL - Count Numerical Errors
+	final Map<Double, Double> countNumericalErrors = new TreeMap<Double, Double>();
+	// ADDITIONAL - Reaction Wheel 'desired' control torque.
+	final Map<Double, double[]> reactionWheelDesiredTorque = new TreeMap<Double, double[]>();
+	// ADDITIONAL - ExternalTorque.
+	final Map<Double, double[]> externalTorque = new TreeMap<Double, double[]>();
 
 	// to check intervalToStore
 	final long intervalToStore;
@@ -281,7 +293,6 @@ public class StepHandler implements OrekitFixedStepHandler {
 			this.detControllability.put(
 					currentState.getDate().durationFrom(startTime),
 					detControllability);
-
 			// controllability conditionNumber
 			double conditionNumberControllability = 0D;
 			if (satellite.getController() instanceof BaseController){
@@ -296,6 +307,46 @@ public class StepHandler implements OrekitFixedStepHandler {
 					errorQuaternion.getQ2(), errorQuaternion.getQ3()};
 			stateSpaceQuaternions.put(currentState.getDate().durationFrom(startTime),
 					quatErrVector);
+
+			// gama
+			double gama = 0.0D;
+			if (satellite.getController() instanceof ProportionalNonLinearQuaternionFullSDREHInfinityController){
+				gama = ((ProportionalNonLinearQuaternionFullSDREHInfinityController)satellite.getController()).getGama();
+			}
+			if (satellite.getController() instanceof ProportionalNonLinearMRPSDREHInfinityController){
+				gama = ((ProportionalNonLinearMRPSDREHInfinityController)satellite.getController()).getGama();
+			}
+			this.gama.put(
+					currentState.getDate().durationFrom(startTime),
+					gama);
+
+			// condition number A and numericalErrors
+			double conditionNumberA = 0D;
+			double countNumericalErrors = 0l;
+			if (satellite.getController() instanceof BaseController){
+				conditionNumberA = ((BaseController)satellite.getController()).getConditionNumberA();
+				if (conditionNumberA == Double.POSITIVE_INFINITY) {
+					conditionNumberA = -1; // to visualize the graph
+				}
+				countNumericalErrors = ((BaseController)satellite.getController()).getCountNumericalErrors();
+			}
+			this.conditionNumberA.put(
+					currentState.getDate().durationFrom(startTime),
+					conditionNumberA);
+			this.countNumericalErrors.put(
+					currentState.getDate().durationFrom(startTime),
+					countNumericalErrors);
+			
+			// reaction wheel 'desired' control torque
+			if (satellite.getSetOfReactionWheels() != null) {
+				reactionWheelDesiredTorque.put(
+						currentState.getDate().durationFrom(startTime),
+						satellite.getSetOfReactionWheels().getState()
+								.getIdealControlTorque().toArray());
+			}
+			
+			//external torque
+			this.externalTorque.put(currentState.getDate().durationFrom(startTime), satellite.getCurrentExternalTorque().toArray());
 			
 			lastStoredTime = currentState.getDate().durationFrom(startTime);
 
@@ -431,7 +482,16 @@ public class StepHandler implements OrekitFixedStepHandler {
 				"24. condition number of controllability ("
 						+ this.satellite.getController().getClass()
 								.getSimpleName() + ")", "");
-		
+
+		// ADDITIONAL - GAMA
+		Plotter.plot2DScatter(gama,
+				"25. gamma ("
+						+ this.satellite.getController().getClass()
+								.getSimpleName() + ")", "");
+
+		// ADDITIONAL - EXTERNAL TORQUE
+		Plotter.plot3DScatter(externalTorque, "26. external Torque");
+
 		// ADDITIONAL - 3D satellite attitude visualizer
 		try {
 			logger.trace("Sleeping until all graphs are shown.");

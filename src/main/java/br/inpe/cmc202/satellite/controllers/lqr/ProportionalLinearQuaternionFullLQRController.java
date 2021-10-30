@@ -35,7 +35,7 @@ public class ProportionalLinearQuaternionFullLQRController extends
 				{ 0, 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0, 0, 0 },
 				{ 0, 0, 0, 0, 0, 0, 0 } });
 		final RealMatrix B = MatrixUtils.createRealMatrix(7, 3);
-		B.setSubMatrix(satellite.getI_inverse().scalarMultiply(-1).getData()
+		B.setSubMatrix(satellite.getI_inverse_nominal().scalarMultiply(-1).getData()
 				.clone(), 4, 0);
 
 		// reseting elements outside diagonal

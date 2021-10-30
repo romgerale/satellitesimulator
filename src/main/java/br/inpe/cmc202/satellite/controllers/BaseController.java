@@ -18,10 +18,16 @@ import org.slf4j.LoggerFactory;
  */
 public class BaseController implements Controller {
 
+	private static final double EPSILON = 1.0E-1;
+
 	private final Logger logger = LoggerFactory.getLogger(BaseController.class);
 
 	private double detControllability;
 	private double conditionNumberControllability;
+	
+	protected double conditionNumberA;
+	protected long countNumericalErrors;
+	
 
 	public BaseController() {
 		super();
@@ -39,7 +45,7 @@ public class BaseController implements Controller {
 		final RealMatrix closedLoop = A.subtract(B.multiply(K));
 		EigenDecomposition eigDecomp = new EigenDecomposition(closedLoop);
 		for (double eigenValues : eigDecomp.getRealEigenvalues()) {
-			if (eigenValues > 0) {
+			if (eigenValues > EPSILON) {
 				logger.warn(
 						"STABILITY CHECK - UNSTABLE STEP - Real part of an eigen value of the step is non negative. {} ",
 						eigenValues);
@@ -59,6 +65,10 @@ public class BaseController implements Controller {
 	 */
 	protected void checkPointwiseControlability(final RealMatrix A,
 			final RealMatrix B) {
+		// computing the condition number of A
+		SingularValueDecomposition svdA = new SingularValueDecomposition(A);
+		this.conditionNumberA = svdA.getConditionNumber();
+		
 		final int numberOfStates = A.getRowDimension();
 		final int numberOfColumns = numberOfStates * B.getColumnDimension();
 		final int numberOfRows = B.getRowDimension();
@@ -146,12 +156,25 @@ public class BaseController implements Controller {
 	}
 
 	/**
-	 * @return the detControllability
+	 * @return the ConditionNumberControllability
 	 */
 	public double getConditionNumberControllability() {
 		return conditionNumberControllability;
 	}
 
+	/**
+	 * @return the ConditionNumberA
+	 */
+	public double getConditionNumberA() {
+		return conditionNumberA;
+	}
+	
+	/**
+	 * @return the detControllability
+	 */
+	public long getCountNumericalErrors() {
+		return countNumericalErrors;
+	}
 	/*
 	 * (non-Javadoc)
 	 * 

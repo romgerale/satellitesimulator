@@ -52,11 +52,18 @@ public class SetOfReactionWheels {
 	 * State
 	 */
 	private SetOfReactionWheelsState state;
+	
+	/**
+	 *  To store if the hard-nonlinearities in the reaction wheel is in place.
+	 *  It constrains the maximum angular velocity and the maximum torque in each axis
+	 */
+	private final boolean reactionWheelHardNonlinearities;
 
 	/**
 	 * @param satelliteConfiguration
+	 * @param reactionWheelHardNonlinearities it indicates if the hard nonlinearities is in place
 	 */
-	public SetOfReactionWheels(Properties satelliteConfiguration) {
+	public SetOfReactionWheels(Properties satelliteConfiguration, boolean reactionWheelHardNonlinearities) {
 		if (satelliteConfiguration != null) {
 			this.MAX_TORQ = Double.valueOf(satelliteConfiguration.getProperty(
 					"reactionWheel.maxTorque", "0.075d"));
@@ -76,7 +83,10 @@ public class SetOfReactionWheels {
 				.createRealMatrix(new double[][] { { INERTIA, 0, 0 },
 						{ 0, INERTIA, 0 }, { 0, 0, INERTIA } });
 		this.state = new SetOfReactionWheelsState(Vector3D.ZERO, Vector3D.ZERO,
+				Vector3D.ZERO,
 				INERTIA);
+		
+		this.reactionWheelHardNonlinearities = reactionWheelHardNonlinearities;
 	}
 
 	/**
@@ -91,20 +101,22 @@ public class SetOfReactionWheels {
 	 *            previousState - important for velocity (integrated)
 	 * @return
 	 */
-	public SetOfReactionWheelsState actuate(Vector3D controlTorque, double dt,
-			SetOfReactionWheelsState state) {
+	public SetOfReactionWheelsState actuate(final Vector3D idealControlTorque, final double dt,
+			final SetOfReactionWheelsState state) {
 
+		Vector3D controlTorque = idealControlTorque;
+		
 		// check limits of torques
-		if (FastMath.abs(controlTorque.getX()) > MAX_TORQ) {
+		if (FastMath.abs(controlTorque.getX()) > MAX_TORQ && reactionWheelHardNonlinearities) {
 			controlTorque = new Vector3D(FastMath.signum(controlTorque.getX())
 					* MAX_TORQ, controlTorque.getY(), controlTorque.getZ());
 		}
-		if (FastMath.abs(controlTorque.getY()) > MAX_TORQ) {
+		if (FastMath.abs(controlTorque.getY()) > MAX_TORQ && reactionWheelHardNonlinearities) {
 			controlTorque = new Vector3D(controlTorque.getX(),
 					FastMath.signum(controlTorque.getY()) * MAX_TORQ,
 					controlTorque.getZ());
 		}
-		if (FastMath.abs(controlTorque.getZ()) > MAX_TORQ) {
+		if (FastMath.abs(controlTorque.getZ()) > MAX_TORQ && reactionWheelHardNonlinearities) {
 			controlTorque = new Vector3D(controlTorque.getX(),
 					controlTorque.getY(), FastMath.signum(controlTorque.getZ())
 							* MAX_TORQ);
@@ -121,7 +133,7 @@ public class SetOfReactionWheels {
 
 		// check saturation in the angular velocity,and change the
 		// torque accordingly
-		if (FastMath.abs(angularVelocity.getX()) > MAX_ANGULAR_VELOCITY) {
+		if (FastMath.abs(angularVelocity.getX()) > MAX_ANGULAR_VELOCITY && reactionWheelHardNonlinearities) {
 			controlTorque = new Vector3D(FastMath.signum(controlTorque.getX())
 					* (MAX_ANGULAR_VELOCITY - FastMath.abs(state
 							.getAngularVelocity().getX())) * INERTIA / dt,
@@ -130,7 +142,7 @@ public class SetOfReactionWheels {
 					* FastMath.signum(angularVelocity.getX()),
 					angularVelocity.getY(), angularVelocity.getZ());
 		}
-		if (FastMath.abs(angularVelocity.getY()) > MAX_ANGULAR_VELOCITY) {
+		if (FastMath.abs(angularVelocity.getY()) > MAX_ANGULAR_VELOCITY && reactionWheelHardNonlinearities) {
 			controlTorque = new Vector3D(controlTorque.getX(),
 					FastMath.signum(controlTorque.getY())
 							* (MAX_ANGULAR_VELOCITY - FastMath.abs(state
@@ -141,7 +153,7 @@ public class SetOfReactionWheels {
 							* FastMath.signum(angularVelocity.getY()),
 					angularVelocity.getZ());
 		}
-		if (FastMath.abs(angularVelocity.getZ()) > MAX_ANGULAR_VELOCITY) {
+		if (FastMath.abs(angularVelocity.getZ()) > MAX_ANGULAR_VELOCITY && reactionWheelHardNonlinearities) {
 			controlTorque = new Vector3D(controlTorque.getX(),
 					controlTorque.getY(), FastMath.signum(controlTorque.getZ())
 							* (MAX_ANGULAR_VELOCITY - FastMath.abs(state
@@ -159,13 +171,13 @@ public class SetOfReactionWheels {
 		if (FastMath.abs(state.getAngularVelocity().getNorm())
 				- FastMath.abs(angularVelocity.getNorm()) > (FastMath.sqrt(4
 				* MAX_ANGULAR_ACCELERATION_APPROX
-				* MAX_ANGULAR_ACCELERATION_APPROX) * dt)) {
+				* MAX_ANGULAR_ACCELERATION_APPROX) * dt) && reactionWheelHardNonlinearities) {
 			throw new RuntimeException(
 					"Error in the processing of angular velocity");
 		}
 
 		// updating instantaneous torque and the angular velocity
-		this.state = new SetOfReactionWheelsState(controlTorque,
+		this.state = new SetOfReactionWheelsState(controlTorque, idealControlTorque,
 				angularVelocity, INERTIA);
 		return this.state;
 	}
@@ -183,6 +195,20 @@ public class SetOfReactionWheels {
 	 */
 	public SetOfReactionWheelsState getState() {
 		return state;
+	}
+
+	/**
+	 * @return the maximum angular velocity in radians/s
+	 */	
+	public double getMAX_ANGULAR_VELOCITY() {
+		return MAX_ANGULAR_VELOCITY;
+	}
+
+	/**
+	 * @return the maximum torque in Newton.meter (N.m)
+	 */	
+	public double getMAX_TORQ() {
+		return MAX_TORQ;
 	}
 
 }

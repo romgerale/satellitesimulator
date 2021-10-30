@@ -4,7 +4,6 @@ import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.geometry.euclidean.threed.Vector3DComplement;
 import org.hipparchus.linear.ArrayRealVector;
 import org.hipparchus.linear.RealVector;
-import org.hipparchus.random.RandomDataGenerator;
 import org.orekit.attitudes.Attitude;
 import org.orekit.attitudes.AttitudeProvider;
 import org.orekit.attitudes.AttitudeProviderModifier;
@@ -35,8 +34,6 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 	final private KinematicsAttitudeProvider underlyingAttitudeProvider;
 	final private Satellite satellite;
 
-	final private RandomDataGenerator externalTorqueGenerator;
-
 	/**
 	 * @param attitudeProvider
 	 * @param satellite
@@ -54,12 +51,6 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 
 		this.underlyingAttitudeProvider = (KinematicsAttitudeProvider) attitudeProvider;
 		this.satellite = satellite;
-
-		if (this.satellite.getExternalTorquesMagnitude() != 0) {
-			externalTorqueGenerator = new RandomDataGenerator();
-		} else {
-			externalTorqueGenerator = null;
-		}
 
 	}
 
@@ -89,13 +80,7 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 				previousAttitude.getRotationAcceleration().toArray());
 
 		// external torque
-		RealVector externalTorque = new ArrayRealVector(3, 0);
-		if (externalTorqueGenerator != null) {
-			externalTorque = new ArrayRealVector(new double[] {
-					externalTorqueGenerator.nextNormal(satellite.getExternalTorquesMagnitude(),1d),
-					externalTorqueGenerator.nextNormal(satellite.getExternalTorquesMagnitude(),1d),
-					externalTorqueGenerator.nextNormal(satellite.getExternalTorquesMagnitude(),1d) });
-		}
+		RealVector externalTorque = this.satellite.getCurrentAndPrepareNextExternalTorque();
 
 		// magnetorquer
 		// and external torques in the center of mass
@@ -106,6 +91,9 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 					new ArrayRealVector(satellite.getSetOfMagnetorquer()
 							.getState().getControlTorque().toArray())
 							.add(externalTorque));
+		} else {
+			firstComponent = satellite.getI_inverse().operate(
+							externalTorque);
 		}
 
 		// rigid body

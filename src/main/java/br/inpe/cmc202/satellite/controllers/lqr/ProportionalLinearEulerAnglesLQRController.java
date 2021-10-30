@@ -31,7 +31,7 @@ public class ProportionalLinearEulerAnglesLQRController extends BaseController {
 				{ 0, 0, 0, 0, 0, 1 }, { 0, 0, 0, 0, 0, 0 },
 				{ 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0, 0 } });
 		final RealMatrix B = MatrixUtils.createRealMatrix(6, 3);
-		B.setSubMatrix(satellite.getI_inverse().scalarMultiply(-1).getData()
+		B.setSubMatrix(satellite.getI_inverse_nominal().scalarMultiply(-1).getData()
 				.clone(), 3, 0);
 
 		// reseting elements outside diagonal

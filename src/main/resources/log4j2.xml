@@ -5,13 +5,17 @@
 			<PatternLayout
 				pattern="%d{HH:mm:ss.SSS} [%t] %-4level %logger{8} %X{date} - %msg%n" />
 		</Console>
+		<File name="File" fileName="target/all-${date:yyyy-MM-dd_hh-mm-ss}.log" immediateFlush="true" append="false">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-4level %logger{8} %X{date} - %msg%n"/>
+        </File>
 	</Appenders>
 	<Loggers>
 		<Root level="INFO">
 			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
 		</Root>
 		<Logger
-			name="br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearQuaternionFullSDREController"
+			name="br.inpe.cmc202.satellite.controllers"
 			level="error" additivity="false">
 			<AppenderRef ref="Console" />
 		</Logger>
