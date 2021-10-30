@@ -39,6 +39,18 @@ public class Environment {
 
 	final private Logger logger = LoggerFactory.getLogger(Environment.class);
 
+	// it is based on a Additive White Gaussian Noise (AWGN)
+	// selecting sigma to strive for max 1 externalTorqueMagnitude
+	// Sigma	Chance to have more than 1 externalTorqueMagnitude
+	// 1		69%	
+	// 2		31%	
+	// 3		6.7%	
+	// 4		0.62%	
+	// 5		0.023%	
+	// 6		0.00034%	
+	// 7		0.0000019%	
+	final private static double SIGMA = 7d;
+
 	/**
 	 * Constructor for Environment.
 	 * 
@@ -62,32 +74,25 @@ public class Environment {
 				RandomDataGenerator externalTorqueGeneratorY = new RandomDataGenerator();
 				RandomDataGenerator externalTorqueGeneratorZ = new RandomDataGenerator();
 
-				// it is based on a Additive White Gaussian Noise (AWGN)
-				// 0.33 (3 sigmas, 99.7%) to strive for max 1 externalTorqueMagnitude
-				// 0.25 (4 sigmas, 99.9937%) to strive for max 1 externalTorqueMagnitude
-				// 0.20 (5 sigmas, 99.99943%) to strive for max 1 externalTorqueMagnitude
-				// 0.16 (6 sigmas, 99.999998%) to strive for max 1 externalTorqueMagnitude
-				double sigma = 6d;
-
 				// for inspection of perturbed torque
 				final Map<Double, double[]> torques = new HashMap<Double, double[]>();
 
 				// computing points
 				for (int i = 0; i < MAX_DATA; i++) {
 					RealVector externalTorque = new ArrayRealVector(new double[] {
-							externalTorqueGeneratorX.nextNormal(0d, externalTorquesMagnitude / sigma),
-							externalTorqueGeneratorY.nextNormal(0d, externalTorquesMagnitude / sigma),
-							externalTorqueGeneratorZ.nextNormal(0d, externalTorquesMagnitude / sigma)});
+							externalTorqueGeneratorX.nextNormal(0d, externalTorquesMagnitude / SIGMA),
+							externalTorqueGeneratorY.nextNormal(0d, externalTorquesMagnitude / SIGMA),
+							externalTorqueGeneratorZ.nextNormal(0d, externalTorquesMagnitude / SIGMA)});
 	
 					iExternalTorques.add(externalTorque);
 					torques.put(Double.valueOf(i), externalTorque.toArray());
 					
 				}
 
-				logger.error("Computed external torque for magnitude {} using {} sigmas!", externalTorquesMagnitude, sigma);
+				logger.error("Computed external torque for magnitude {} using {} sigmas N(0,{})!", externalTorquesMagnitude, SIGMA, externalTorquesMagnitude / SIGMA);
 
 				// plotting external torque
-				Plotter.plot3DScatter(torques, "externalTorquesMagnitude" + externalTorquesMagnitude);
+				Plotter.plot3DScatter(torques, "externalTorques for p=" + externalTorquesMagnitude);
 			}
 		}
 	}

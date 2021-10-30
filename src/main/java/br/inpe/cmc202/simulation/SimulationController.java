@@ -512,7 +512,7 @@ public class SimulationController implements Runnable {
 					angularVelocityError[1],
 					angularVelocityError[2]});
 			if (stateSpace.getNorm() > epsilon) {
-				logger.info("NOT CONVERGED! norm {} epsilon {}", stateSpace.getNorm(), epsilon);
+				logger.info("NOT CONVERGED! norm {} epsilon {} satellite {}", stateSpace.getNorm(), epsilon, this.satellite);
 				convergenceStateSpace = false;
 				break;
 			}

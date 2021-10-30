@@ -652,9 +652,19 @@ public class Satellite {
 				+ ",\n setOfMagnetorquerController="
 				+ setOfMagnetorquerController
 				+ ",\n angularVelocityReference_body="
-				+ angularVelocityReference_body + ",\n sunReference_body="
-				+ sunReference_body + ",\n externalTorquesMagnitude="
-				+ externalTorquesMagnitude + ",\n alpha1=" + alpha1 + "]";
+				+ angularVelocityReference_body
+				+ ",\n sunReference_body="
+				+ sunReference_body
+				+ ",\n externalTorquesMagnitude="
+				+ externalTorquesMagnitude
+				+ ",\n alpha1="
+				+ alpha1 
+				+ ",\n modeUsingAttitude="
+				+ modeUsingAttitude 
+				+ ",\n reactionWheelControllerName="
+				+ reactionWheelControllerName 
+				+ "\n, reactionWheelHardNonlinearities=" 
+				+ reactionWheelHardNonlinearities + "]";
 	}
 	
 	
@@ -695,4 +705,47 @@ public class Satellite {
 	public String getReactionWheelControllerName() {
 		return this.reactionWheelControllerName;
 	}
+
+
+	/**
+	 * Satellites are structurally equal if the inertia tensor, inertia tensor with parametric uncertainty, 
+	 * alpha1, externalTorquesMagnitude, mode and reaction controller name are the same.
+	 * 
+	 */
+	public boolean equalsStructurallly(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Satellite other = (Satellite) obj;
+		if (I == null) {
+			if (other.I != null)
+				return false;
+		} else if (!I.equals(other.I))
+			return false;
+		if (I_mu == null) {
+			if (other.I_mu != null)
+				return false;
+		} else if (!I_mu.equals(other.I_mu))
+			return false;
+		if (Double.doubleToLongBits(alpha1) != Double.doubleToLongBits(other.alpha1))
+			return false;
+		if (Double.doubleToLongBits(externalTorquesMagnitude) != Double
+				.doubleToLongBits(other.externalTorquesMagnitude))
+			return false;
+		if (modeUsingAttitude != other.modeUsingAttitude)
+			return false;
+		if (reactionWheelControllerName == null) {
+			if (other.reactionWheelControllerName != null)
+				return false;
+		} else if (!reactionWheelControllerName.equals(other.reactionWheelControllerName))
+			return false;
+		if (reactionWheelHardNonlinearities != other.reactionWheelHardNonlinearities)
+			return false;
+		return true;
+	}
+	
+	
 }

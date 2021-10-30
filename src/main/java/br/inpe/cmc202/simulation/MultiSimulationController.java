@@ -33,6 +33,7 @@ import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.inpe.cmc202.satellite.Satellite;
 import br.inpe.cmc202.simulation.plotter.Plotter;
 
 /**
@@ -104,6 +105,10 @@ public class MultiSimulationController implements Runnable {
 	final Map<String, Map<Double, double[]>> initialAngles = new TreeMap<String, Map<Double, double[]>>();
 	final Map<String, Map<Double, double[]>> initialAngularVelocities = new TreeMap<String, Map<Double, double[]>>();
 	
+	protected int headless = 0;
+	
+	private final static String FORMAT = "#0.0000";
+	
 	/**
 	 * Default constructor.
 	 */
@@ -116,9 +121,10 @@ public class MultiSimulationController implements Runnable {
 	 * @param approach for the definition of initial conditions (0 - NORNAL, 1 - UNIFORM, 2 - STATE SPACE EXPLORATION)
 	 * @throws OrekitException
 	 */
-	public MultiSimulationController(int numberOfSimulations, int approach) throws OrekitException {		
+	public MultiSimulationController(int numberOfSimulations, int approach, int headless) throws OrekitException {		
 		logger.info("----------------------------");
-		logger.info("Configuring multi simulation... number of simulations: {}", numberOfSimulations);
+		logger.info("Configuring multi simulation (headless:{})... number of simulations: {}", headless, numberOfSimulations);
+		this.headless = headless;
 
 		computeInitialConditions(numberOfSimulations, approach);
 		// getting the computed initial conditions
@@ -158,8 +164,18 @@ public class MultiSimulationController implements Runnable {
 
 		plotSimulations(mapSimulations);
 		
-		plotDomainOfAttraction(mapSimulations, "CONVERGED", true);
-		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED", true);
+		plotDomainOfAttraction(mapSimulations, "CONVERGED", false);
+		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED", false);
+		
+		try {
+			if (headless == 1) {
+				logger.info("Headless configured! Exiting...");
+				Thread.sleep(10000);
+				System.exit(0);
+			}
+		} catch (InterruptedException ie) {
+			// ignore
+		}
 	}
 
 	/**
@@ -177,16 +193,20 @@ public class MultiSimulationController implements Runnable {
 
 		int numberOfSimulations = 0;
 		int approach = 1;
+		int headless = 0;
 		if (args.length > 0) {
 			numberOfSimulations = Integer.parseInt(args[0]);
 			if (args.length > 1) {
 				approach = Integer.parseInt(args[1]);
 			}
+			if (args.length > 2) {
+				headless = Integer.parseInt(args[2]);
+			}
 		} else {
 			throw new RuntimeException("It must be informed the number of trials!");
 		}
 
-		new MultiSimulationController(numberOfSimulations, approach).run();
+		new MultiSimulationController(numberOfSimulations, approach, headless).run();
 	}
 	
 	//****
@@ -237,21 +257,21 @@ public class MultiSimulationController implements Runnable {
 			details += "";
 			// logger.info("**** ");
 			// logger.info(details);
-			Plotter.plot2DLine(quaternionError, key, "quaternion error", details);
-			Plotter.plot2DLine(angularVelocity, key, "angular velocity", details);
-			Plotter.plot2DLine(detControllability, key + " detControllability", false);
-			Plotter.plot2DLine(reactionWheelAngularVelocity, key, " reaction wheel angular velocity", details);
-			Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + " reactionWheelAngularMomentum", false);
+			Plotter.plot2DLine(quaternionError, "Simulations - " + key + " quaternion error", "quaternion error", details);
+			Plotter.plot2DLine(angularVelocity, "Simulations - " + key + " angular velocity", "angular velocity", details);
+			Plotter.plot2DLine(detControllability, "Simulations - " + key + " detControllability", false);
+			Plotter.plot2DLine(reactionWheelAngularVelocity, "Simulations - " + key + " reaction wheel angular velocity", " reaction wheel angular velocity", details);
+			Plotter.plot2DLine(reactionWheelNormAngularMomentum, "Simulations - " + key + " reactionWheelAngularMomentum", false);
 
 			// STATE SPACE
-			Plotter.plot3DScatterStateSpace(vetQuaternionError, key + " state space quaternion - BODY", false);
-			Plotter.plot3DScatterStateSpace(vetAngularVelocity, key + " state space velocity - BODY", false);
+			//Plotter.plot3DScatterStateSpace(vetQuaternionError, "Simulations - " + key + " state space quaternion - BODY", false);
+			//Plotter.plot3DScatterStateSpace(vetAngularVelocity, "Simulations - " + key + " state space velocity - BODY", false);
 
 			// H-INFINITY
-			Plotter.plot2DLine(gama, key + " gama", false);
+			Plotter.plot2DLine(gama, "Simulations - " + key + " gamma", false);
 			// Track numerical Errors
-			Plotter.plot2DLine(conditionNumberA, key + " conditionNumberA", false);
-			Plotter.plot2DLine(countNumericalErrors, key + " countNumericalErrors", false);
+			Plotter.plot2DLine(conditionNumberA, "Simulations - " + key + " conditionNumberA", false);
+			Plotter.plot2DLine(countNumericalErrors, "Simulations - " + key + " countNumericalErrors", false);
 
 		}
 		logger.info("Results plotted!");
@@ -319,7 +339,7 @@ public class MultiSimulationController implements Runnable {
 		boolean someSimulationPolygon = false;
 
 		// ENFORCING polygon for norm FOR NON CONVERGENT (consequently, conservative results)
-		// NOTE BETWEEN CONVERGENT RESULTS CAN EMERGE "HOLES
+		// NOTE BETWEEN CONVERGENT RESULTS CAN EMERGE "HOLES"
 		// iterating over not converged 
 		// for each controller
 		boolean done = false;
@@ -346,20 +366,22 @@ public class MultiSimulationController implements Runnable {
 					
 					final double normEulerAngles = s.getEulerAnglesOfInitialCondition().getNorm();
 					final double normAngVelocity = s.getAngularVelocityOfInitialCondition().getNorm();
+					final Satellite satelliteNC = s.satellite;
 	
 					// searching in convergent to move to NOT CONVERGED if it does not satisfy the condition (polygon)
 					List<SimulationController> l2check = new ArrayList<SimulationController>(l);
 					for (SimulationController s2check : l2check) {
 						// it ran
 						if (s2check.ran()) {
-							final String controllerNameToRun = s2check.satellite.getReactionWheelControllerName();
+							//final String controllerNameToRun = s2check.satellite.getReactionWheelControllerName();
+							final Satellite satelliteC = s2check.satellite;
 							final double normEulerAnglesToRun = s2check.getEulerAnglesOfInitialCondition().getNorm();
 							final double normAngVelocityToRun = s2check.getAngularVelocityOfInitialCondition().getNorm();
-							if (controllerNameToRun.equals(controller) &&
+							if (satelliteC.equalsStructurallly(satelliteNC) &&
 									normEulerAnglesToRun > normEulerAngles 
 									&& normAngVelocityToRun > normAngVelocity) {
 								logger.info("Found a simulation that is CONVERGENT but it does not satisfy POLYGON for NORM: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
-										controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
+										satelliteC, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
 								// adding to not converged
 								lnc.add(s2check);
 								// removing from converged
@@ -456,10 +478,10 @@ public class MultiSimulationController implements Runnable {
 							                                 reactionWheelStats.get(controller));
 				}
 	
-				Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED " + p,
-						new String[] {"mean of Norm", "standard deviation of Norm"});
-				Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED " + p,
-						new String[] {"mean of Norm", "standard deviation of Norm"});
+				//Plotter.plot2DScatter(stateSpaceStatsForGraph, "Statistics of L2 Norm of State Space - CONVERGED " + p,
+				//		new String[] {"mean of Norm", "standard deviation of Norm"});
+				//Plotter.plot2DScatter(reactionWheelStatsForGraph, "Statistics of L2 Norm of Reaction Wheel Angular Momentum - CONVERGED " + p,
+				//		new String[] {"mean of Norm", "standard deviation of Norm"});
 			}
 			logger.info("Results computed {} about norm of state space and norm of reaction wheel angular momentum!", someValueComputed);
 		}
@@ -537,14 +559,18 @@ public class MultiSimulationController implements Runnable {
 							sumNormActualControl,
 							sumNormIdealControl});
 
-					minMaxGamma.get(controller).put(++i, new double[] {
+					if (minGamma != 0d || maxGamma != 0d || minMaxGamma.get(controller).size() == 0) {
+						minMaxGamma.get(controller).put(++i, new double[] {
 							minGamma,
 							maxGamma});
+					}
 				}
 	
 			}
 	
 			if (someValueComputed && plotStatistics) {
+				final DecimalFormat df = new DecimalFormat(FORMAT);
+
 				// computing mean and standard deviation of overall sum by each controller
 				// for each controller
 				final Map<String, Map<Double, double[]>> optimalStateControlForGraph = new TreeMap<String, Map<Double, double[]>>();
@@ -576,17 +602,17 @@ public class MultiSimulationController implements Runnable {
 							                                 ",Samples="+statStateSpaceOverall.getN()+")", 
 							                                 optimalStateControl.get(controller));
 
-					minMaxGammaForGraph.put(controller + " (Min=" + minGamma + 
-                            ",Max=" + maxGamma + ")", 
+					minMaxGammaForGraph.put(controller + " (Min=" + df.format(minGamma) + 
+                            ",Max=" + df.format(maxGamma) + ")", 
                             minMaxGamma.get(controller));
 				}
 	
-				Plotter.plot2DScatter(optimalStateControlForGraph, "Statistics of Optimality - CONVERGED " + p,
-						new String[] {"sum of Norm of state", "sum of Norm of control"});
-				Plotter.plot2DScatter(minMaxGammaForGraph, "Min Gamma vs Max Gamma - CONVERGED " + p,
+				//Plotter.plot2DScatter(optimalStateControlForGraph, "Statistics of Optimality - CONVERGED " + p,
+				//		new String[] {"sum of Norm of state", "sum of Norm of control"});
+				Plotter.plot2DScatter(minMaxGammaForGraph, "Results - Min Gamma vs Max Gamma - CONVERGED " + p,
 						new String[] {"min Gamma", "max Gamma"});
-				Plotter.plot2DScatter(optimalIdealActualTorque, "Norm of Actual Control vs Norm of Computed Control - CONVERGED " + p,
-						new String[] {"sum of Norm of Actual Control", "sum of Norm of Computed Control"});
+				//Plotter.plot2DScatter(optimalIdealActualTorque, "Norm of Actual Control vs Norm of Computed Control - CONVERGED " + p,
+				//		new String[] {"sum of Norm of Actual Control", "sum of Norm of Computed Control"});
 			}
 			logger.info("Results computed {} about sum of norm of state space and sum of norm of control torque (reaction wheel control torque)!", someValueComputed);
 		}
@@ -667,16 +693,20 @@ public class MultiSimulationController implements Runnable {
 			}
 	
 			if (someValueComputed && plotStatistics) {
+				final DecimalFormat df = new DecimalFormat(FORMAT);
 				// computing mean and standard deviation of overall integral by each controller
 				final Map<String, Map<Double, double[]>> optimalStateControlForGraph = new TreeMap<String, Map<Double, double[]>>();
 				for (String controller : optimalStateControl.keySet()) {
 					final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
 					for (final double i: optimalStateControl.get(controller).keySet()) {
 						final double[] xy = optimalStateControl.get(controller).get(i);
-						statStateSpaceOverall.addValue(xy[0] + xy[1]);
+						
+						// 1/2 *  \int x^TQx + u^TRu
+						statStateSpaceOverall.addValue(.5d * (xy[0] + xy[1]));
 					}
-					optimalStateControlForGraph.put(controller + " (SUM - Mean=" + statStateSpaceOverall.getMean() + 
-							                                 ",Std=" + statStateSpaceOverall.getStandardDeviation() + 
+
+					optimalStateControlForGraph.put(controller + " (1/2 SUM - Mean=" + df.format(statStateSpaceOverall.getMean()) + 
+							                                 ",Std=" + df.format(statStateSpaceOverall.getStandardDeviation()) + 
 							                                 ",Samples="+statStateSpaceOverall.getN()+")", 
 							                                 optimalStateControl.get(controller));
 				}
@@ -684,13 +714,13 @@ public class MultiSimulationController implements Runnable {
 				//creating the bisectrix for the actual/computed control
 				TreeMap<Double, double[]> bisectrix = new TreeMap<Double, double[]>();
 				optimalIdealActualTorque.put("bisectrix", bisectrix);
-				for (double delta = 0; delta < maxIntControl;  delta+= 0.01d ) {
+				for (double delta = 0; delta < maxIntControl;  delta += (maxIntControl/30d) ) {
 					bisectrix.put(delta, new double[] { delta, delta});
 				}
 
-				Plotter.plot2DScatter(optimalStateControlForGraph, "Statistics of Optimality (Integral) - CONVERGED " + p,
+				Plotter.plot2DScatter(optimalStateControlForGraph, "Results - Statistics of Optimality (Integral) - CONVERGED " + p,
 						new String[] {"integral statespace", "integral actual control"});
-				Plotter.plot2DScatter(optimalIdealActualTorque, "Integral of Actual Control vs Integral of Computed Control - CONVERGED " + p,
+				Plotter.plot2DScatter(optimalIdealActualTorque, "Results - Integral of Actual Control vs Integral of Computed Control - CONVERGED " + p,
 						new String[] {"integral computed control", "integral actual control"});
 			}
 			logger.info("Results computed {} about integral of state space and integral of control torque (reaction wheel control torque)!", someValueComputed);
@@ -821,6 +851,8 @@ public class MultiSimulationController implements Runnable {
 						final Double xPresent = data.get(x);
 						if (xPresent == null || y > xPresent.doubleValue()) {
 							data.put(x, y);
+						} else {
+							logger.info("Found similar data x{} y{}!", x, y);
 						}
 					}
 					// filtering results
@@ -829,8 +861,10 @@ public class MultiSimulationController implements Runnable {
 						computePolygon(controller, data, filteredData);
 						double area = computeArea(controller, filteredData);
 						
+						final DecimalFormat df = new DecimalFormat(FORMAT);
+						
 						domainOfAttractionNormShape.put(controller, filteredData);
-						domainOfAttractionNormShapeForGraph.put(controller + " (area= "+area+")", filteredData);
+						domainOfAttractionNormShapeForGraph.put(controller + " (area= "+df.format(area)+", samples= "+(filteredData.size()-2)+")", filteredData);
 					} else {
 						logger.info("No data available for computing the shape of {}!", controller);
 					}
@@ -839,14 +873,14 @@ public class MultiSimulationController implements Runnable {
 			}
 			
 			// plotting
-			Plotter.plot2DScatter(domainOfAttractionNorm, "Domain of Attraction - Norm " + label,
-					new String[] {"norm of Euler Angles", "norm of angular velocity"});
+			Plotter.plot2DScatter(domainOfAttractionNorm, "Results - Domain of Attraction - Norm - " + label,
+					new String[] {"norm of Euler angles", "norm of angular velocity"});
 			if (plotAttitudeAndAngularVelocity) {
-				Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Domain of Attraction - Attitude " + label);
-				Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Domain of Attraction - AngularVelocity " + label);
+				Plotter.plot3DScatterStateSpace(domainOfAttractionAttitude, "Results - Domain of Attraction - Attitude " + label);
+				Plotter.plot3DScatterStateSpace(domainOfAttractionAngularVelocity, "Results - Domain of Attraction - AngularVelocity " + label);
 			}
-			Plotter.plot2DLine(domainOfAttractionNormShapeForGraph, "Domain of Attraction - Norm - Shape " + label,
-					true, new String[] {"norm of Euler Angles", "norm of angular velocity"});
+			Plotter.plot2DLine(domainOfAttractionNormShapeForGraph, "Results - Domain of Attraction - Norm - Shape - " + label,
+					true, new String[] {"norm of Euler angles", "norm of angular velocity"});
 		}
 		
 		logger.info("Domain of Attraction ({}) plotted {}!", label, hasSomeDomainOfAttraction);
@@ -886,7 +920,7 @@ public class MultiSimulationController implements Runnable {
 		}
 
 		// last point "FAKE" reusing x and y=0
-		filteredData.put(end+1E-10, 0d);
+		filteredData.put(end+1, 0d); //+1E-10
 	}
 
 	protected double computeArea(final String controller, final Map<Double, Double> filteredData) {
@@ -901,7 +935,8 @@ public class MultiSimulationController implements Runnable {
 				vec[count--] = new Vector2D(xx, filteredData.get(xx));	
 			}
 			vec[0] = new Vector2D(0d, 0d);
-			PolygonsSet polygon = new PolygonsSet(10E-5d, vec);
+			logger.info("Controller {}  polygon = {} ", controller, vec);
+			PolygonsSet polygon = new PolygonsSet(1E-10d, vec); //1E-5d
 			area = polygon.getSize();
 			logger.info("Area controller {} = {} ", controller, area);
 		} catch (Exception e) {
@@ -934,6 +969,8 @@ public class MultiSimulationController implements Runnable {
 		// for checking external boundaries of attractor
 		final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
 		final RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+		final double maxControllableAngularVelocity = max.getLInfNorm(); //max.getMinValue()
+		logger.info("Maximum Angular Velocity Controllable by reaction wheels: {}. For simulation: {}!", max, maxControllableAngularVelocity);
 
 		//*********************************
 		// INITIAL CONDITIONS 
@@ -943,9 +980,9 @@ public class MultiSimulationController implements Runnable {
 		// private static final double BASE_ANGULAR_VELOCITY = .11d; // IACLAW // 0.01d SPACEOPS
 		final double MEAN_ANGULAR_VELOCITY = 0d; // .087d; // SPIE
 
-		// standard deviation
+		// standard deviation (3 sigmas)
 		final double STD_ANGLE = 180d/3d;
-		final double STD_ANGULAR_VELOCITY = max.getLInfNorm()/3d;
+		final double STD_ANGULAR_VELOCITY = maxControllableAngularVelocity/3d;
 
 		// MONTE CARLO PARAMETERS - UNIFORM
 		// CHANGED STRATEGY FOR MONTE CARLO FROM NORMAL TO UNIFORM
@@ -961,9 +998,24 @@ public class MultiSimulationController implements Runnable {
 		//private static final double LOWER_ANGULAR_VELOCITY = -0.02d;
 		//private static final double UPPER_ANGULAR_VELOCITY = 0.02d;
 
-		final double LOWER_ANGULAR_VELOCITY = -1 * max.getLInfNorm();//-15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-		final double UPPER_ANGULAR_VELOCITY = max.getLInfNorm();//15E-3d; //1E-1d // too big
+		final double LOWER_ANGULAR_VELOCITY = -1 * maxControllableAngularVelocity;//-15E-3d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+		final double UPPER_ANGULAR_VELOCITY = maxControllableAngularVelocity;//15E-3d; //1E-1d // too big
+		
+		if (approach == 0 ) {
+			// NORMAL
+			logger.info("NORMAL - Euler Angles X: N({},{}) Y: N({},{}) Z: N({},{})", MEAN_ANGLE, STD_ANGLE, MEAN_ANGLE, STD_ANGLE/3d, MEAN_ANGLE, STD_ANGLE/3d);
+			logger.info("NORMAL - Angular Velocities X: N({},{}) Y: N({},{}) Z: N({},{})", MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY, MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY, MEAN_ANGULAR_VELOCITY, STD_ANGULAR_VELOCITY);
+		} else {
+			// UNIFORM
+			logger.info("UNIFORM - Euler Angles X: U({},{}) Y: U({},{}) Z: U({},{})", LOWER_ANGLE, UPPER_ANGLE, LOWER_ANGLE/2d, UPPER_ANGLE/2d, LOWER_ANGLE, UPPER_ANGLE);
+			logger.info("UNIFORM - Angular Velocities X: U({},{}) Y: U({},{}) Z: U({},{})", LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY, LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY, LOWER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY);
+		}
 
+		// max value for the norm
+		final RealVector maxNormEulerAngles = new ArrayRealVector(new Double[] {UPPER_ANGLE, UPPER_ANGLE/2, UPPER_ANGLE});
+		final RealVector maxNormAngularVelocity = new ArrayRealVector(new Double[] {UPPER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY, UPPER_ANGULAR_VELOCITY});
+		logger.info("MAX NORM: Euler Angles: {} Angular Velocities: {}", maxNormEulerAngles.getNorm(), maxNormAngularVelocity.getNorm());
+		
 		// INITIAL CONDITIONS 
 		//*********************************
 
@@ -1171,11 +1223,11 @@ public class MultiSimulationController implements Runnable {
 			}
 		}
 		
-		Plotter.plot3DScatterStateSpace(initialAngles, "initial Euler Angles (n = " + initialAngles.get("initialAngles").size() + ") Euler Angles");
-		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "initial Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
-		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "initial Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
-		Plotter.plot2DScatter(initialNorm, "Initial Conditions - Norm",
-				new String[] {"norm of Euler Angles", "norm of angular velocity"});
+		Plotter.plot3DScatterStateSpace(initialAngles, "Initial Conditions - Euler Angles (n = " + initialAngles.get("initialAngles").size() + ")");
+		Plotter.plot3DScatterStateSpace(initialAnglesForVisualization, "Initial Conditions - Euler Angles (n = " + initialAnglesForVisualization.get("initialAnglesForVisualization").size() + ") for the unit vector");
+		Plotter.plot3DScatterStateSpace(initialAngularVelocities, "Initial Conditions - Angular Velocities (n = " + initialAngularVelocities.get("initialAngularVelocities").size() + ")");
+		Plotter.plot2DScatter(initialNorm, "Initial Conditions - Norm (n = " + initialNorm.get("initialNorm").size() + ")",
+				new String[] {"norm of Euler angles", "norm of angular velocity"});
 
 		logger.info("{} initial conditions computed!", initialAngles.get("initialAngles").size());
 		logger.info("----------------------------");
@@ -1205,13 +1257,14 @@ public class MultiSimulationController implements Runnable {
 			
 			// checking convergence
 			final boolean convergence = storedSimulationController.checkConvergence();
-			final String controllerName =  storedSimulationController.satellite.getReactionWheelControllerName();
+			//final String controllerName =  storedSimulationController.satellite.getReactionWheelControllerName();
+			final Satellite satelliteRan = storedSimulationController.satellite;
 			if (!convergence) {
 				// adding to not converged
-				List<SimulationController> lnc = storedMapSimulationsNotConverged.get(controllerName);
+				List<SimulationController> lnc = storedMapSimulationsNotConverged.get(satelliteRan.getReactionWheelControllerName());
 				if (lnc == null) {
 					lnc = new ArrayList<SimulationController>();
-					storedMapSimulationsNotConverged.put(controllerName, lnc);
+					storedMapSimulationsNotConverged.put(satelliteRan.getReactionWheelControllerName(), lnc);
 				}
 				lnc.add(storedSimulationController);
 				
@@ -1220,14 +1273,15 @@ public class MultiSimulationController implements Runnable {
 				final double normAngVelocity = storedSimulationController.getAngularVelocityOfInitialCondition().getNorm();
 				for (Runnable toRun : executorPool.getQueue()) {
 					SimulationController toRunS = ((SimulationControllerRunnable) toRun).storedSimulationController;
-					final String controllerNameToRun = toRunS.satellite.getReactionWheelControllerName();
+					//final String controllerNameToRun = toRunS.satellite.getReactionWheelControllerName();
+					final Satellite satelliteToRun = toRunS.satellite;
 					final double normEulerAnglesToRun = toRunS.getEulerAnglesOfInitialCondition().getNorm();
 					final double normAngVelocityToRun = toRunS.getAngularVelocityOfInitialCondition().getNorm();
-					if (controllerNameToRun.equals(controllerName) &&
+					if (satelliteToRun.equalsStructurallly(satelliteRan) &&
 							normEulerAnglesToRun > normEulerAngles 
 							&& normAngVelocityToRun > normAngVelocity) {
 						logger.info("Found a simulation that should NOT RUN: {} Norm Euler Angles {} Norm Angular Velocity {} - REFERENCE Norm Euler Angles {} Norm Angular Velocity {}",
-								controllerNameToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
+								satelliteToRun, normEulerAnglesToRun, normAngVelocityToRun, normEulerAngles, normAngVelocity);
 						// remove from EXECUTOR
 						logger.info("Removing from executor, success: {}!", executorPool.remove(toRun));
 						// adding to not converged
@@ -1237,10 +1291,10 @@ public class MultiSimulationController implements Runnable {
 				
 			} else {
 				// adding to converged
-				List<SimulationController> l = storedMapSimulations.get(controllerName);
+				List<SimulationController> l = storedMapSimulations.get(satelliteRan.getReactionWheelControllerName());
 				if (l == null) {
 					l = new ArrayList<SimulationController>();
-					storedMapSimulations.put(controllerName, l);
+					storedMapSimulations.put(satelliteRan.getReactionWheelControllerName(), l);
 				}
 				l.add(storedSimulationController);
 			}

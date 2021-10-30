@@ -35,23 +35,28 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 	
 	// percent
-	final double LOWER_DEVIATION_PARAMETRIC = -3E-1d; 
-	final double UPPER_DEVIATION_PARAMETRIC = +3E-1d; 
+	final double LOWER_DEVIATION_PARAMETRIC = -15E-1d; 
+	final double UPPER_DEVIATION_PARAMETRIC = +15E-1d; 
 	// it is based on a Additive White Gaussian Noise (AWGN), so there is no mean to use negative values for magnitude
 	// percent of max torque of reaction wheel
 	final double LOWER_DEVIATION_UNSTRUCTURED = 0d;     //-8E-2d; 
-	final double UPPER_DEVIATION_UNSTRUCTURED = +3E-1d; //+8E-2d; 
+	final double UPPER_DEVIATION_UNSTRUCTURED = +22d; // +15E-1d; // with 50E-1, LQR and SDRE worked until 0.3
 			
-	final int NUMBER_OF_DEVIATIONS = 13;  
+	final int NUMBER_OF_DEVIATIONS = 7; //13 
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
 
-	public MultiSimulationUncertaintyController(int numberOfSimulations, int approach, int perturbationType) throws OrekitException {
+	private final int headless;
+	private final int perturbationType;
+	
+	public MultiSimulationUncertaintyController(int numberOfSimulations, int approach, int perturbationType, int headless) throws OrekitException {
 		super();
 		logger.info("----------------------------");
-		logger.info("Configuring multi simulation... number of simulations: {}", numberOfSimulations);
-
+		logger.info("Configuring multi simulation(headless={})... number of simulations: {}", headless, numberOfSimulations);
+		this.headless = headless;
+		this.perturbationType = perturbationType;
+		
 		computeInitialConditions(numberOfSimulations, approach);
 		// getting the computed initial conditions
 		final Map<Double, double[]> initialAnglesComputed = initialAngles.get("initialAngles");
@@ -62,11 +67,13 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		if (perturbationType == 0) {
 			LOWER_DEVIATION = LOWER_DEVIATION_PARAMETRIC;
 			UPPER_DEVIATION = UPPER_DEVIATION_PARAMETRIC;
+			logger.info("Deviations in the Inertia Tensor. Lower: {}, Upper: {}", LOWER_DEVIATION, UPPER_DEVIATION);
 		} else {
 			final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
 			final Double maxTorque = ss.satellite.getSetOfReactionWheels().getMAX_TORQ();
 			LOWER_DEVIATION = maxTorque * LOWER_DEVIATION_UNSTRUCTURED;
 			UPPER_DEVIATION = maxTorque * UPPER_DEVIATION_UNSTRUCTURED;
+			logger.info("Maximum Torque of Reaction Wheels: {}, Lower External Torque: {}, Upper External Torque: {}", maxTorque, LOWER_DEVIATION, UPPER_DEVIATION);
 		}
 		
 		//computing perturbation
@@ -124,7 +131,9 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		
 		Map<String, Map<Double, double[][]>> mmap = new TreeMap<String, Map<Double, double[][]>>();
 		Map<String, Double> amap = new TreeMap<String, Double>();
-				
+		double maxP = Double.MIN_VALUE;
+		double minP = Double.MAX_VALUE;
+		
 		for (Double p: mapSimulationsU.keySet()) {
 			final Map<String, List<SimulationController>> mapSimulationsUP = mapSimulationsU.get(p);
 			final Map<String, List<SimulationController>> mapSimulationsNotConvergedUP = mapSimulationsNotConvergedU.get(p);
@@ -133,13 +142,20 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 			computeResults(mapSimulationsUP, mapSimulationsNotConvergedUP, p, true);
 			logger.info("Computed PERTURBATION {}, CONVERGED {} NOT CONVERGED {}!", p, mapSimulationsUP.size(), mapSimulationsNotConvergedUP.size());
 			
-			Map<String, Map<Double, Double>> domainShape = plotDomainOfAttraction(mapSimulationsUP, "CONVERGED "+p, false);
+			Map<String, Map<Double, Double>> domainShape = plotDomainOfAttraction(mapSimulationsUP, "CONVERGED p="+p, false);
 			consolidateDomainOfAttraction(mmap, p, domainShape, amap);
 			
-			//plotDomainOfAttraction(mapSimulationsNotConvergedUP, "NOT CONVERGED "+p, false);
+			plotDomainOfAttraction(mapSimulationsNotConvergedUP, "NOT CONVERGED p= "+p, false);
 			
 			// to check
 			//plotSimulations(mapSimulationsNotConvergedUP);
+			
+			if (maxP < p) {
+				maxP = p;
+			}
+			if (minP > p ) {
+				minP = p;
+			}
 
 		}
 		
@@ -152,9 +168,21 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 
 				Double area = amap.get(controller);
 				
-				Plotter.plot3DLinesDomainOfAttraction(mmapP, "Domain Of Attraction - Uncertainty - " + controller + " Area: " + area, false);
+				// enforcing scale of z(p)
+				Plotter.plot3DLinesDomainOfAttraction(mmapP, "Results - Domain Of Attraction - Uncertainty "+(perturbationType == 0?"STRUCTURED":"UNSTRUCTURED")+" - " + controller + " Area: " + area, false, minP, maxP);
 			}
 		}
+		
+		try {
+			if (headless == 1) {
+				logger.info("Headless configured! Exiting...");
+				Thread.sleep(10000);
+				System.exit(0);
+			}
+		} catch (InterruptedException ie) {
+			// ignore
+		}
+
 		
 	}
 	
@@ -270,6 +298,7 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 		int numberOfSimulations = 0;
 		int approach = 1;
 		int perturbationType = 0;
+		int headless = 0;
 		if (args.length > 0) {
 			numberOfSimulations = Integer.parseInt(args[0]);
 			if (args.length > 1) {
@@ -277,12 +306,15 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 				if (args.length > 2) {
 					perturbationType = Integer.parseInt(args[2]);
 				}
+				if (args.length > 3) {
+					headless = Integer.parseInt(args[3]);
+				}
 			}
 		} else {
 			throw new RuntimeException("It must be informed the number of trials!");
 		}
 
-		new MultiSimulationUncertaintyController(numberOfSimulations, approach, perturbationType).run();
+		new MultiSimulationUncertaintyController(numberOfSimulations, approach, perturbationType, headless).run();
 
 	}
 }

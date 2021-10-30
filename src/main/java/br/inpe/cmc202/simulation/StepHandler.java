@@ -485,7 +485,7 @@ public class StepHandler implements OrekitFixedStepHandler {
 
 		// ADDITIONAL - GAMA
 		Plotter.plot2DScatter(gama,
-				"25. gama ("
+				"25. gamma ("
 						+ this.satellite.getController().getClass()
 								.getSimpleName() + ")", "");
 
