@@ -970,7 +970,7 @@ public class MultiSimulationController implements Runnable {
 		final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
 		final RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
 		final double maxControllableAngularVelocity = max.getLInfNorm(); //max.getMinValue()
-		logger.info("Maximum Angular Velocity Controllable by reaction wheels: {}. For simulation: {}!", max, maxControllableAngularVelocity);
+		logger.info("Maximum Angular Velocity Controllable by reaction wheels: {} NORM: {}. For simulation: {}!", max, max.getNorm(), maxControllableAngularVelocity);
 
 		//*********************************
 		// INITIAL CONDITIONS 

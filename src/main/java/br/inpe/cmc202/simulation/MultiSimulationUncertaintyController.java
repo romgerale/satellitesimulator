@@ -40,9 +40,9 @@ public class MultiSimulationUncertaintyController extends MultiSimulationControl
 	// it is based on a Additive White Gaussian Noise (AWGN), so there is no mean to use negative values for magnitude
 	// percent of max torque of reaction wheel
 	final double LOWER_DEVIATION_UNSTRUCTURED = 0d;     //-8E-2d; 
-	final double UPPER_DEVIATION_UNSTRUCTURED = +22d; // +15E-1d; // with 50E-1, LQR and SDRE worked until 0.3
+	final double UPPER_DEVIATION_UNSTRUCTURED = +2d; ///+22d; // +15E-1d; // with 50E-1, LQR and SDRE worked until 0.3
 			
-	final int NUMBER_OF_DEVIATIONS = 7; //13 
+	final int NUMBER_OF_DEVIATIONS = 5;//7; //13 
 
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsU = new HashMap<Double, Map<String, List<SimulationController>>>();
 	final private Map<Double, Map<String, List<SimulationController>>> mapSimulationsNotConvergedU = new HashMap<Double, Map<String, List<SimulationController>>>();
