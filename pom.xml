@@ -48,37 +48,37 @@
 		<dependency>
 			<artifactId>hipparchus-core</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-fitting</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-geometry</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-ode</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-optim</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-stat</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-filtering</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.9-SNAPSHOT</version>
+			<version>1.8</version>
 		</dependency>
 		<!-- END using the last version of Hipparchus -->
 		<dependency>
