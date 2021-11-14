@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>br.inpe.pos.cmc204</groupId>
 	<artifactId>satellitesimulator</artifactId>
-	<version>0.2.1-SNAPSHOT</version>
+	<version>0.2.2-SNAPSHOT</version>
 	<name>SatelliteSimulator</name>
 
 	<properties>
