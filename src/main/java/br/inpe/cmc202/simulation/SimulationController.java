@@ -496,21 +496,29 @@ public class SimulationController implements Runnable {
 		final Set<Double> timesToEvaluate = new TreeSet<Double>(this.stepHandler.quaternionError.keySet());
 		timesToEvaluate.removeIf(v -> v < tToTestConvergence );
 
-		final double epsilon = 1.E-2;
+		final double epsilon = 1.E-4; //1.E-2
 		for (final Double t : timesToEvaluate) {
-			final double[] quaternionError = this.stepHandler.quaternionError.get(t);
+			//final double[] quaternionError = this.stepHandler.quaternionError.get(t);
 			final double[] angularVelocityError = this.stepHandler.angularVelocityBody.get(t);
 			// compute the norm of state space: 
 			// quaternion (last entry as scalar and adjusted to origin) 
 			// and angular velocity
+			//final RealVector stateSpace = new ArrayRealVector(new double[] { 
+			//		quaternionError[0],
+			//		quaternionError[1],
+			//		quaternionError[2], 
+			//		1-FastMath.abs(quaternionError[3]), // adjusting to origin 0
+			//		angularVelocityError[0],
+			//		angularVelocityError[1],
+			//		angularVelocityError[2]});
+			
+			// as SDRE based on GIBBs has numerical problems when angular velocity goes to zero
+			// THEREFORE, checking only angular velocities
 			final RealVector stateSpace = new ArrayRealVector(new double[] { 
-					quaternionError[0],
-					quaternionError[1],
-					quaternionError[2], 
-					1-FastMath.abs(quaternionError[3]), // adjusting to origin 0
 					angularVelocityError[0],
 					angularVelocityError[1],
 					angularVelocityError[2]});
+
 			if (stateSpace.getNorm() > epsilon) {
 				logger.info("NOT CONVERGED! norm {} epsilon {} satellite {}", stateSpace.getNorm(), epsilon, this.satellite);
 				convergenceStateSpace = false;
