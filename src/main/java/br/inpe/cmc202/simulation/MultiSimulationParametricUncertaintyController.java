@@ -81,6 +81,7 @@ public class MultiSimulationParametricUncertaintyController extends MultiSimulat
 	 * @return
 	 */
 	private Properties calculateInertiaTensorUsingUniform(RandomDataGenerator inertiaTensorRandom) {
+		/*
 		double v12 = 0.0d;
 		double v13 = 0.0d;
 		double v23 = 0.0d;
@@ -100,6 +101,41 @@ public class MultiSimulationParametricUncertaintyController extends MultiSimulat
 				.toString(inertiaTensorRandom.nextUniform(0.0574d - (0.0574d * RANGE), 0.0574d + (0.0574d * RANGE))));
 
 		logger.info("Monte Carlo iteration - Inertia Tensor: {} ", inertiaTensor);
+		return inertiaTensor;
+		*/
+		// loading and copying satellite configuration
+		final Properties inertiaTensor = new Properties();
+		try { 
+			final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
+			for (final String key : ss.satelliteConfiguration.stringPropertyNames()) {
+				if (key.startsWith("inertiaMoment")) {
+					inertiaTensor.put(key, ss.satelliteConfiguration.get(key));
+				}
+			}
+		} catch (OrekitException ex) {
+			throw new RuntimeException(ex);
+		}
+		
+		// it changes the diagonal elements
+		final double v11 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.1"));
+		final double v22 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.2.2"));
+		final double v33 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.3.3"));
+		inertiaTensor.put("inertiaMoment.1.1", Double.toString(inertiaTensorRandom.nextUniform(v11 - (v11 * RANGE), v11 + (v11 * RANGE))));
+		inertiaTensor.put("inertiaMoment.2.2", Double.toString(inertiaTensorRandom.nextUniform(v22 - (v22 * RANGE), v22 + (v22 * RANGE))));
+		inertiaTensor.put("inertiaMoment.3.3", Double.toString(inertiaTensorRandom.nextUniform(v33 - (v33 * RANGE), v33 + (v33 * RANGE))));
+		
+		// it changes other elements
+		double v12 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.2"));
+		double v13 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.3"));
+		double v23 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.2.3"));
+		inertiaTensor.put("inertiaMoment.1.2", Double.toString(v12));
+		inertiaTensor.put("inertiaMoment.1.3", Double.toString(v13));
+		inertiaTensor.put("inertiaMoment.2.1", Double.toString(v12));
+		inertiaTensor.put("inertiaMoment.2.3", Double.toString(v23));
+		inertiaTensor.put("inertiaMoment.3.1", Double.toString(v13));
+		inertiaTensor.put("inertiaMoment.3.2", Double.toString(v23));
+
+		logger.info("Inertia Tensor: {} ", inertiaTensor);
 		return inertiaTensor;
 	}
 

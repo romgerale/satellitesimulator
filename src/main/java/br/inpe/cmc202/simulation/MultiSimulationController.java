@@ -15,6 +15,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.hipparchus.distribution.RealDistribution;
+import org.hipparchus.distribution.continuous.NormalDistribution;
 import org.hipparchus.exception.MathIllegalStateException;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
@@ -28,6 +30,8 @@ import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.linear.RealVector;
 import org.hipparchus.random.RandomDataGenerator;
 import org.hipparchus.stat.descriptive.DescriptiveStatistics;
+import org.hipparchus.stat.inference.KolmogorovSmirnovTest;
+import org.hipparchus.stat.inference.TTest;
 import org.math.plot.utils.FastMath;
 import org.orekit.errors.OrekitException;
 import org.slf4j.Logger;
@@ -84,8 +88,8 @@ public class MultiSimulationController implements Runnable {
 
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
 			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
-					"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
+					"ProportionalNonLinearQuaternionSDREController_GIBBS"));
+					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 					//"ProportionalNonLinearMRPSDREController_FIRST"));
 					//"ProportionalNonLinearMRPSDREHInfinityController"));
 					//"NopeController"));
@@ -240,7 +244,9 @@ public class MultiSimulationController implements Runnable {
 							+ numberFormatter.format(s.initialAttitude[2]) + ") initial angular velocity rad/s ("
 							+ numberFormatter.format(s.initialAngularVelocity[0]) + ";"
 							+ numberFormatter.format(s.initialAngularVelocity[1]) + ";"
-							+ numberFormatter.format(s.initialAngularVelocity[2]) + ")";
+							+ numberFormatter.format(s.initialAngularVelocity[2]) + ")"
+							+ " Inertia Tensor Nominal: "+ s.satellite.getI_nominal().toString()
+							+ " Inertia Tensor Real: "+ s.satellite.getI().toString();
 				}
 				quaternionError.add(s.stepHandler.quaternionError);
 				angularVelocity.add(s.stepHandler.angularVelocityBody);
@@ -252,11 +258,11 @@ public class MultiSimulationController implements Runnable {
 				gama.put(detail, s.stepHandler.gama);
 				conditionNumberA.put(detail, s.stepHandler.conditionNumberA);
 				countNumericalErrors.put(detail, s.stepHandler.countNumericalErrors);
-				details += "\n" + detail;
+				logger.info(details);
+				details = "";
 			}
-			details += "";
-			// logger.info("**** ");
-			// logger.info(details);
+			//details += "";
+			//logger.info("**** ");
 			Plotter.plot2DLine(quaternionError, "Simulations - " + key + " quaternion error", "quaternion error", details);
 			Plotter.plot2DLine(angularVelocity, "Simulations - " + key + " angular velocity", "angular velocity", details);
 			Plotter.plot2DLine(detControllability, "Simulations - " + key + " detControllability", false);
@@ -725,7 +731,113 @@ public class MultiSimulationController implements Runnable {
 			}
 			logger.info("Results computed {} about integral of state space and integral of control torque (reaction wheel control torque)!", someValueComputed);
 		}
-		
+
+		// COMPUTING measures about 
+		// 1)  \int x^TQx + u^TRu
+		// KolmogorovSmirnovTest
+		// Ttest
+		{
+			boolean someValueComputed = false;
+			
+			final RealMatrix Q = MatrixUtils.createRealIdentityMatrix(3);
+			final RealMatrix R = MatrixUtils.createRealIdentityMatrix(3);
+			
+			final Map<String, Map<Double, double[]>> optimalStateControl = new TreeMap<String, Map<Double, double[]>>();
+			
+			// for each controller
+			for (String controller : mapSimulations.keySet()) {
+				double i = 0d;
+				optimalStateControl.put(controller, new TreeMap<Double, double[]>());
+				
+				// for each simulation for a given controller
+				for (SimulationController s : mapSimulations.get(controller)) {
+					double intStateSpace = 0d;
+					double intActualControl = 0d;
+					
+					for (Double t : s.stepHandler.quaternionError.keySet()) {
+						//final double[] quartenionError = s.stepHandler.quaternionError.get(t);
+						final double[] angularVelocityError = s.stepHandler.angularVelocityBody.get(t);
+						final double[] actualControl = s.stepHandler.reactionWheelTorque.get(t);
+						final double step = s.step;
+						
+						// state space: 
+						// ONLY ANGULAR VELOCITY DUE TO THE LACK OF CONVERGENCE IN THE QUATERNIONS 
+						final RealMatrix stateSpace = MatrixUtils.createColumnRealMatrix(new double[] { 
+								angularVelocityError[0],
+								angularVelocityError[1],
+								angularVelocityError[2]});
+
+						final RealMatrix actualControlV = MatrixUtils.createColumnRealMatrix(actualControl); 
+
+						// integrating
+						intStateSpace += stateSpace.transpose().multiply(Q).multiply(stateSpace).scalarMultiply(step).getEntry(0, 0);
+						intActualControl += actualControlV.transpose().multiply(R).multiply(actualControlV).scalarMultiply(step).getEntry(0, 0);
+												
+						someValueComputed = true;
+					}
+													
+					optimalStateControl.get(controller).put(++i, new double[] {
+							intStateSpace,
+							intActualControl});
+						
+				}
+	
+			}
+	
+			if (someValueComputed && plotStatistics) {
+				final DecimalFormat df = new DecimalFormat(FORMAT);
+				final DecimalFormat df2 = new DecimalFormat("#0.0000000000");
+				
+				// computing mean and standard deviation of overall integral by each controller
+				final Map<String, Map<Double, double[]>> optimalStateControlForGraph = new TreeMap<String, Map<Double, double[]>>();
+				double[] data1 = null;
+				double[] data2 = null;
+				for (String controller : optimalStateControl.keySet()) {
+					final DescriptiveStatistics statStateSpaceOverall = new DescriptiveStatistics();
+					for (final double i: optimalStateControl.get(controller).keySet()) {
+						final double[] xy = optimalStateControl.get(controller).get(i);
+						
+						// 1/2 *  \int x^TQx + u^TRu
+						statStateSpaceOverall.addValue(.5d * (xy[0] + xy[1]));
+					}
+
+					// testing for normal distribution
+					RealDistribution normal = new NormalDistribution(statStateSpaceOverall.getMean(), statStateSpaceOverall.getStandardDeviation());
+					KolmogorovSmirnovTest test = new KolmogorovSmirnovTest();
+					double ptest = test.kolmogorovSmirnovTest(normal, statStateSpaceOverall.getValues());
+					logger.info("STATISTICAL TEST - Tested for normal distribution using KolmogorovSmirnovTest Normal({},{}) controller {} and found observed significance level {}!", statStateSpaceOverall.getMean(), statStateSpaceOverall.getStandardDeviation(), controller, ptest);
+
+					optimalStateControlForGraph.put(controller + " (1/2 SUM - Mean=" + df.format(statStateSpaceOverall.getMean()) + 
+							                                 ",Std=" + df.format(statStateSpaceOverall.getStandardDeviation()) + 
+							                                 ",Samples="+statStateSpaceOverall.getN()+"), (p="+df.format(ptest)+")", 
+							                                 optimalStateControl.get(controller));
+					
+					if (data1 == null) {
+						data1 = statStateSpaceOverall.getValues();
+					} else if (data2 == null) {
+						data2 = statStateSpaceOverall.getValues();
+					} else {
+						logger.info("STATISTICAL TEST - Data not used for next statistical test  {}!", controller);
+					}
+				}
+
+				//testing controllers
+				TTest testT = new TTest();
+				double ptestT = 0;
+				if (data1 != null && data2 != null) {
+					ptestT = testT.tTest(data1, data2);
+					logger.info("STATISTICAL TEST - Tested for the mean difference between two Js is zero using TTest and found observed significance level {}!", ptestT);
+				} else {
+					logger.info("STATISTICAL TEST - NOT Tested due to lack of data!", ptestT);
+				}
+				
+				Plotter.plot2DScatter(optimalStateControlForGraph, "Results - Statistics of Optimality (Integral) - CONVERGED " + p + " - Observed significance (p) =" + df2.format(ptestT),
+						new String[] {"integral statespace", "integral actual control"});
+			}
+
+			logger.info("Results computed {} about integral of state space and integral of control torque (reaction wheel control torque) as well as STATISTICAL TESTs!", someValueComputed);
+		}
+
 		logger.info("Polygon enforced {}!", someSimulationPolygon);
 		logger.info("----------------------------");
 	}

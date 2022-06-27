@@ -38,12 +38,12 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	// CILAMCE 2020
 	// "ProportionalNonLinearQuaternionSDREController_GIBBS",
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
-			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
+			Arrays.asList(//"ProportionalLinearQuaternionPartialLQRController",
 					"ProportionalNonLinearQuaternionSDREController_GIBBS",
-					"ProportionalNonLinearQuaternionFullSDREHInfinityController",
+					"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 					//"ProportionalNonLinearMRPSDREController_FIRST",
 					//"ProportionalNonLinearMRPSDREHInfinityController",
-					"NopeController"));
+					//"NopeController"));
 	
 	static final private Logger logger = LoggerFactory
 			.getLogger(MultiSimulationParametricUncertaintyPlusController.class);
@@ -51,17 +51,20 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	// MONTE CARLO PARAMETERS - GAUSSIAN
 	// standard deviation for INERTIA TENSOR - 3 standard deviation equals 5%
 	private static final double STD = 0.016666d;
+	// range for uniform distribution
+	private static final double RANGE = 0.2d;
 
 	// UNIFORM 
 	// CILAMCE - 2020
 	private static final double LOWER_ANGLE = -180d;
 	private static final double UPPER_ANGLE = 180d;
-	//private static final double LOWER_ANGULAR_VELOCITY = -0.01d;
-	//private static final double UPPER_ANGULAR_VELOCITY = 0.01d;
+	private static final double LOWER_ANGULAR_VELOCITY = -0.01d;
+	private static final double UPPER_ANGULAR_VELOCITY = 0.01d;
 	
-	private static final double LOWER_ANGULAR_VELOCITY = -1E-4d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
-	private static final double UPPER_ANGULAR_VELOCITY = 1E-4d;
+	//private static final double LOWER_ANGULAR_VELOCITY = -1E-4d; //GIBBS and GIBBS H-Infinity require the min angular velocity as 1E-4d while others not: LQR AND MRP
+	//private static final double UPPER_ANGULAR_VELOCITY = 1E-4d;
 
+	
 	/**
 	 * @param monteCarlo
 	 * @throws OrekitException
@@ -86,7 +89,7 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 
 			//final Properties inertiaTensor = calculateInertiaTensorUsingUniform(inertiaTensorRandom);
 			final Properties inertiaTensor =
-			 calculateInertiaTensorUsingNormal(inertiaTensorRandom);
+			 calculateInertiaTensorUsingUniform(inertiaTensorRandom);
 
 			double[] initialAttitudeEulerAngles = new double[] { gaussianAnglesX.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
 					gaussianAnglesY.nextUniform(LOWER_ANGLE, UPPER_ANGLE),
@@ -146,6 +149,7 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 	 * @return
 	 */
 	private Properties calculateInertiaTensorUsingNormal(RandomDataGenerator inertiaTensorRandom) {
+		/*
 		double v12 = inertiaTensorRandom.nextNormal(1.11d, 1.11d * STD);
 		double v13 = inertiaTensorRandom.nextNormal(1.01d, 1.01d * STD);
 		double v23 = inertiaTensorRandom.nextNormal(-0.35d, 0.35d * STD);
@@ -162,9 +166,85 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 		inertiaTensor.put("inertiaMoment.3.3", Double.toString(inertiaTensorRandom.nextNormal(530.7d, 530.7d * STD)));
 		logger.info("Monte Carlo iteration - Inertia Tensor: {} ", inertiaTensor);
 		return inertiaTensor;
+		*/
+		// loading and copying satellite configuration
+		final Properties inertiaTensor = new Properties();
+		try { 
+			final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
+			for (final String key : ss.satelliteConfiguration.stringPropertyNames()) {
+				if (key.startsWith("inertiaMoment")) {
+					inertiaTensor.put(key, ss.satelliteConfiguration.get(key));
+				}
+			}
+		} catch (OrekitException ex) {
+			throw new RuntimeException(ex);
+		}
+		
+		// it changes the diagonal elements
+		final double v11 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.1"));
+		final double v22 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.2.2"));
+		final double v33 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.3.3"));
+		inertiaTensor.put("inertiaMoment.1.1", Double.toString(inertiaTensorRandom.nextNormal(v11, v11 * STD)));
+		inertiaTensor.put("inertiaMoment.2.2", Double.toString(inertiaTensorRandom.nextNormal(v22, v22 * STD)));
+		inertiaTensor.put("inertiaMoment.3.3", Double.toString(inertiaTensorRandom.nextNormal(v33, v33 * STD)));
+		
+		// it changes other elements
+		double v12 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.2"));
+		double v13 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.3"));
+		double v23 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.2.3"));
+		inertiaTensor.put("inertiaMoment.1.2", Double.toString(v12));
+		inertiaTensor.put("inertiaMoment.1.3", Double.toString(v13));
+		inertiaTensor.put("inertiaMoment.2.1", Double.toString(v12));
+		inertiaTensor.put("inertiaMoment.2.3", Double.toString(v23));
+		inertiaTensor.put("inertiaMoment.3.1", Double.toString(v13));
+		inertiaTensor.put("inertiaMoment.3.2", Double.toString(v23));
+
+		logger.info("Inertia Tensor: {} ", inertiaTensor);
+		return inertiaTensor;
 	}
 
-	protected void plotSimulations() {
+	/**
+	 * @param inertiaTensorRandom
+	 * @return
+	 */
+	private Properties calculateInertiaTensorUsingUniform(RandomDataGenerator inertiaTensorRandom) {
+		// loading and copying satellite configuration
+		final Properties inertiaTensor = new Properties();
+		try { 
+			final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
+			for (final String key : ss.satelliteConfiguration.stringPropertyNames()) {
+				if (key.startsWith("inertiaMoment")) {
+					inertiaTensor.put(key, ss.satelliteConfiguration.get(key));
+				}
+			}
+		} catch (OrekitException ex) {
+			throw new RuntimeException(ex);
+		}
+		
+		// it changes the diagonal elements
+		final double v11 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.1"));
+		final double v22 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.2.2"));
+		final double v33 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.3.3"));
+		inertiaTensor.put("inertiaMoment.1.1", Double.toString(inertiaTensorRandom.nextUniform(v11 - (v11 * RANGE), v11 + (v11 * RANGE))));
+		inertiaTensor.put("inertiaMoment.2.2", Double.toString(inertiaTensorRandom.nextUniform(v22 - (v22 * RANGE), v22 + (v22 * RANGE))));
+		inertiaTensor.put("inertiaMoment.3.3", Double.toString(inertiaTensorRandom.nextUniform(v33 - (v33 * RANGE), v33 + (v33 * RANGE))));
+		
+		// it changes other elements
+		double v12 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.2"));
+		double v13 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.1.3"));
+		double v23 = Double.valueOf(inertiaTensor.getProperty("inertiaMoment.2.3"));
+		inertiaTensor.put("inertiaMoment.1.2", Double.toString(v12));
+		inertiaTensor.put("inertiaMoment.1.3", Double.toString(v13));
+		inertiaTensor.put("inertiaMoment.2.1", Double.toString(v12));
+		inertiaTensor.put("inertiaMoment.2.3", Double.toString(v23));
+		inertiaTensor.put("inertiaMoment.3.1", Double.toString(v13));
+		inertiaTensor.put("inertiaMoment.3.2", Double.toString(v23));
+
+		logger.info("Inertia Tensor: {} ", inertiaTensor);
+		return inertiaTensor;
+	}
+	
+	/*protected void plotSimulations(Map<String, List<SimulationController>> mapSimulations) {
 		// plotting
 		for (String key : mapSimulations.keySet()) {
 			String details = "";
@@ -204,7 +284,7 @@ public class MultiSimulationParametricUncertaintyPlusController extends MultiSim
 			//Plotter.plot2DLine(reactionWheelNormAngularMomentum, key + "reactionWheelAngularMomentum");
 			//Plotter.plot2DLine(gama, key + " gama");
 		}
-	}
+	}*/
 
 	/**
 	 * Entry point for the simulation.
