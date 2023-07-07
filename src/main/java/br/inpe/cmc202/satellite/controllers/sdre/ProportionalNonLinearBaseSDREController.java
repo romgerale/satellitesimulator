@@ -80,9 +80,14 @@ public abstract class ProportionalNonLinearBaseSDREController extends
 		final Vector3DComplement angularVelocity2times = new Vector3DComplement(
 				angularVelocity.toArray());
 		// reaction wheel angular momentum times
-		final Vector3DComplement reactionWheelAngularMomentum2times = new Vector3DComplement(
-				satellite.getSetOfReactionWheels().getState()
-						.getAngularMomentum(angularVelocity).toArray());
+		Vector3DComplement reactionWheelAngularMomentum2times = null;
+		if (satellite.getSetOfReactionWheels() !=null) {
+			reactionWheelAngularMomentum2times = new Vector3DComplement(
+					satellite.getSetOfReactionWheels().getState()
+							.getAngularMomentum(angularVelocity).toArray());
+		} else {
+			reactionWheelAngularMomentum2times = new Vector3DComplement(Vector3D.ZERO.toArray());
+		}
 
 		// A_angularVelocity
 		// - I_b^{-1}\omega^{\times}I_b

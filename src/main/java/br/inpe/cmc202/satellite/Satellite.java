@@ -135,17 +135,20 @@ public class Satellite {
 		this.gyroscope = new Gyroscope();
 
 		// actuators
-		if ("SetOfMagnetorquersController".equals(magnetorqueControllerName)) {
+		if (Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("magnetorque", "true"):"true")) {
 			this.setOfMagnetorquer = new SetOfMagnetorquers(
 					satelliteConfiguration);
 		} else {
 			this.setOfMagnetorquer = null;
 		}
-		this.setOfReactionWheels = new SetOfReactionWheels(
+		if (Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("reactionWheel", "true"):"true")) {
+			this.setOfReactionWheels = new SetOfReactionWheels(
 				satelliteConfiguration, 
-				Boolean.valueOf(
-						(satelliteConfiguration != null)?satelliteConfiguration.getProperty("reactionWheel.hardnonlinearities", "true"):"true"));
-
+				Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("reactionWheel.hardnonlinearities", "true"):"true"));
+		} else {
+			this.setOfReactionWheels = null;
+		}
+		
 		// ANGULAR VELOCITY - REFERENCE
 		// ----------------------------------
 		if (satelliteConfiguration == null) {
