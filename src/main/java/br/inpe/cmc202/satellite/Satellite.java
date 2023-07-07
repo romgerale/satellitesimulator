@@ -117,12 +117,7 @@ public class Satellite {
 	 *  To store the controllerName.
 	 */
 	final private String reactionWheelControllerName;
-	
-	/**
-	 *  To store if the hard-nonlinearities in the reaction wheel is in place.
-	 */
-	final private boolean reactionWheelHardNonlinearities = true;
-	
+		
 	/**
 	 * Constructor.
 	 * 
@@ -147,7 +142,9 @@ public class Satellite {
 			this.setOfMagnetorquer = null;
 		}
 		this.setOfReactionWheels = new SetOfReactionWheels(
-				satelliteConfiguration, reactionWheelHardNonlinearities);
+				satelliteConfiguration, 
+				Boolean.valueOf(
+						(satelliteConfiguration != null)?satelliteConfiguration.getProperty("reactionWheel.hardnonlinearities", "true"):"true"));
 
 		// ANGULAR VELOCITY - REFERENCE
 		// ----------------------------------
@@ -662,9 +659,7 @@ public class Satellite {
 				+ ",\n modeUsingAttitude="
 				+ modeUsingAttitude 
 				+ ",\n reactionWheelControllerName="
-				+ reactionWheelControllerName 
-				+ "\n, reactionWheelHardNonlinearities=" 
-				+ reactionWheelHardNonlinearities + "]";
+				+ reactionWheelControllerName + "]";
 	}
 	
 	
@@ -741,8 +736,6 @@ public class Satellite {
 			if (other.reactionWheelControllerName != null)
 				return false;
 		} else if (!reactionWheelControllerName.equals(other.reactionWheelControllerName))
-			return false;
-		if (reactionWheelHardNonlinearities != other.reactionWheelHardNonlinearities)
 			return false;
 		return true;
 	}
