@@ -48,7 +48,7 @@
 		<dependency>
 			<artifactId>hipparchus-core</artifactId>
 			<groupId>org.hipparchus</groupId>
-			<version>1.8</version>
+			<version>1.7</version>
 		</dependency>
 		<dependency>
 			<artifactId>hipparchus-fitting</artifactId>
