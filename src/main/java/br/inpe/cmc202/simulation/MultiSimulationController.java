@@ -87,7 +87,7 @@ public class MultiSimulationController implements Runnable {
 	//				"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 
 	private static final List<String> CONTROLLERS = new ArrayList<String>(
-			Arrays.asList("ProportionalLinearQuaternionPartialLQRController",
+			Arrays.asList(//"ProportionalLinearQuaternionPartialLQRController",
 					"ProportionalNonLinearQuaternionSDREController_GIBBS"));
 					//"ProportionalNonLinearQuaternionFullSDREHInfinityController"));
 					//"ProportionalNonLinearMRPSDREController_FIRST"));
@@ -167,6 +167,7 @@ public class MultiSimulationController implements Runnable {
 		computeResults(mapSimulations, mapSimulationsNotConverged, 0d, true);
 
 		plotSimulations(mapSimulations);
+		plotSimulations(mapSimulationsNotConverged);
 		
 		plotDomainOfAttraction(mapSimulations, "CONVERGED", false);
 		plotDomainOfAttraction(mapSimulationsNotConverged, "NOT CONVERGED", false);
@@ -220,11 +221,12 @@ public class MultiSimulationController implements Runnable {
 	 */
 	protected void plotSimulations(Map<String, List<SimulationController>> mapSimulations) {
 		logger.info("----------------------------");
-		logger.info("Plotting results...");
+		logger.info("Plotting results... Controllers: {}", mapSimulations.size());
 		
 		// plotting
 		NumberFormat numberFormatter = new DecimalFormat("##.00");
 		for (String key : mapSimulations.keySet()) {
+			logger.info("Plotting results... Controllers: {} Simulations: {}", key, mapSimulations.get(key).size());
 			String details = "";
 			List<Map<Double, double[]>> quaternionError = new ArrayList<Map<Double, double[]>>();
 			List<Map<Double, double[]>> angularVelocity = new ArrayList<Map<Double, double[]>>();
@@ -236,6 +238,7 @@ public class MultiSimulationController implements Runnable {
 			Map<String, Map<Double, Double>> gama = new TreeMap<String, Map<Double, Double>>();
 			Map<String, Map<Double, Double>> conditionNumberA = new TreeMap<String, Map<Double, Double>>();
 			Map<String, Map<Double, Double>> countNumericalErrors = new TreeMap<String, Map<Double, Double>>();
+			List<Map<Double, double[]>> thrusterTorque = new ArrayList<Map<Double, double[]>>();
 			for (SimulationController s : mapSimulations.get(key)) {
 				String detail = "";
 				if (s.initialAngularVelocity != null && s.initialAttitude != null) {
@@ -246,7 +249,8 @@ public class MultiSimulationController implements Runnable {
 							+ numberFormatter.format(s.initialAngularVelocity[1]) + ";"
 							+ numberFormatter.format(s.initialAngularVelocity[2]) + ")"
 							+ " Inertia Tensor Nominal: "+ s.satellite.getI_nominal().toString()
-							+ " Inertia Tensor Real: "+ s.satellite.getI().toString();
+							+ " Inertia Tensor Real: "+ s.satellite.getI().toString()
+							+ " Ran: " + s.ran();
 				}
 				quaternionError.add(s.stepHandler.quaternionError);
 				angularVelocity.add(s.stepHandler.angularVelocityBody);
@@ -258,8 +262,9 @@ public class MultiSimulationController implements Runnable {
 				gama.put(detail, s.stepHandler.gama);
 				conditionNumberA.put(detail, s.stepHandler.conditionNumberA);
 				countNumericalErrors.put(detail, s.stepHandler.countNumericalErrors);
-				logger.info(details);
-				details = "";
+				thrusterTorque.add(s.stepHandler.thrusterTorque);
+				logger.info(detail);
+				details = details + detail;
 			}
 			//details += "";
 			//logger.info("**** ");
@@ -268,10 +273,11 @@ public class MultiSimulationController implements Runnable {
 			Plotter.plot2DLine(detControllability, "Simulations - " + key + " detControllability", false);
 			Plotter.plot2DLine(reactionWheelAngularVelocity, "Simulations - " + key + " reaction wheel angular velocity", " reaction wheel angular velocity", details);
 			Plotter.plot2DLine(reactionWheelNormAngularMomentum, "Simulations - " + key + " reactionWheelAngularMomentum", false);
+			Plotter.plot2DLine(thrusterTorque, "Simulations - " + key + " thrusterTorque", "thruster torque", details);
 
 			// STATE SPACE
 			//Plotter.plot3DScatterStateSpace(vetQuaternionError, "Simulations - " + key + " state space quaternion - BODY", false);
-			//Plotter.plot3DScatterStateSpace(vetAngularVelocity, "Simulations - " + key + " state space velocity - BODY", false);
+			Plotter.plot3DScatterStateSpace(vetAngularVelocity, "Simulations - " + key + " state space velocity - BODY", false);
 
 			// H-INFINITY
 			Plotter.plot2DLine(gama, "Simulations - " + key + " gamma", false);
@@ -304,8 +310,16 @@ public class MultiSimulationController implements Runnable {
 				new LinkedBlockingQueue<Runnable>(), threadFactory);
 
 		// starting threads
+		int i =0;
 		for (Runnable s : listSimulations) {
-			executorPool.execute(s);
+			//executorPool.execute(s);
+			s.run();
+			i++;
+			logger.info("");
+			logger.info("{} simulations concluded from the total of {} in {} s (queued: {})",
+					i, listSimulations.size(),
+					(System.currentTimeMillis() - start) / 1000d,
+					0);
 		}
 
 		logger.info("Total of {} simulations are scheduled to run in {} threads", listSimulations.size(),
@@ -316,6 +330,7 @@ public class MultiSimulationController implements Runnable {
 		while (!executorPool.isTerminated()) {
 			try {
 				Thread.sleep(10000);
+				logger.info("");
 				logger.info("{} simulations concluded from the total of {} in {} s (queued: {})",
 						executorPool.getCompletedTaskCount(), listSimulations.size(),
 						(System.currentTimeMillis() - start) / 1000d,
@@ -1080,7 +1095,12 @@ public class MultiSimulationController implements Runnable {
 
 		// for checking external boundaries of attractor
 		final SimulationController ss = new SimulationController("NopeController", new double[] {0,0,0}, new double[] {0,0,0});
-		final RealVector max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+		RealVector max = null;
+		if (ss.satellite.getSetOfReactionWheels() != null) {
+			max = ss.satellite.getMaximumAngularVelocityControllableByReactionWheels();
+		} else {
+			max = new ArrayRealVector(new double[] {0.1d,0.1d,0.1d});
+		}
 		final double maxControllableAngularVelocity = max.getLInfNorm(); //max.getMinValue()
 		logger.info("Maximum Angular Velocity Controllable by reaction wheels: {} NORM: {}. For simulation: {}!", max, max.getNorm(), maxControllableAngularVelocity);
 
