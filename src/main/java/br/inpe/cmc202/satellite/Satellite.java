@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import br.inpe.cmc202.satellite.actuators.SetOfMagnetorquers;
 import br.inpe.cmc202.satellite.actuators.SetOfReactionWheels;
+import br.inpe.cmc202.satellite.actuators.SetOfThrusters;
 import br.inpe.cmc202.satellite.controllers.Controller;
 import br.inpe.cmc202.satellite.controllers.NopeController;
 import br.inpe.cmc202.satellite.controllers.SetOfMagnetorquersController;
@@ -25,6 +26,7 @@ import br.inpe.cmc202.satellite.controllers.linear.ProportionalDerivativeLinearS
 import br.inpe.cmc202.satellite.controllers.lqr.ProportionalLinearEulerAnglesLQRController;
 import br.inpe.cmc202.satellite.controllers.lqr.ProportionalLinearQuaternionFullLQRController;
 import br.inpe.cmc202.satellite.controllers.lqr.ProportionalLinearQuaternionPartialLQRController;
+import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearAngularVelocitySDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearEulerAnglesSDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearMRPSDREController;
 import br.inpe.cmc202.satellite.controllers.sdre.ProportionalNonLinearQuaternionFullSDREController;
@@ -77,6 +79,7 @@ public class Satellite {
 	// actuators
 	final private SetOfMagnetorquers setOfMagnetorquer;
 	final private SetOfReactionWheels setOfReactionWheels;
+	final private SetOfThrusters setOfThrusters;
 
 	// controllers
 	final private Controller controller;
@@ -117,12 +120,7 @@ public class Satellite {
 	 *  To store the controllerName.
 	 */
 	final private String reactionWheelControllerName;
-	
-	/**
-	 *  To store if the hard-nonlinearities in the reaction wheel is in place.
-	 */
-	final private boolean reactionWheelHardNonlinearities = true;
-	
+		
 	/**
 	 * Constructor.
 	 * 
@@ -140,15 +138,26 @@ public class Satellite {
 		this.gyroscope = new Gyroscope();
 
 		// actuators
-		if ("SetOfMagnetorquersController".equals(magnetorqueControllerName)) {
+		if (Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("magnetorque", "true"):"true")) {
 			this.setOfMagnetorquer = new SetOfMagnetorquers(
 					satelliteConfiguration);
 		} else {
 			this.setOfMagnetorquer = null;
 		}
-		this.setOfReactionWheels = new SetOfReactionWheels(
-				satelliteConfiguration, reactionWheelHardNonlinearities);
-
+		if (Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("reactionWheel", "true"):"true")) {
+			this.setOfReactionWheels = new SetOfReactionWheels(
+				satelliteConfiguration, 
+				Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("reactionWheel.hardnonlinearities", "true"):"true"));
+		} else {
+			this.setOfReactionWheels = null;
+		}
+		if (Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("thruster", "true"):"true")) {
+			this.setOfThrusters = new SetOfThrusters(
+					satelliteConfiguration);
+		} else {
+			this.setOfThrusters = null;
+		}
+		
 		// ANGULAR VELOCITY - REFERENCE
 		// ----------------------------------
 		if (satelliteConfiguration == null) {
@@ -277,8 +286,8 @@ public class Satellite {
 		// ********************
 
 		// controller
-		this.reactionWheelControllerName = reactionWheelControllerName;
-		switch (reactionWheelControllerName) {
+		this.reactionWheelControllerName = (reactionWheelControllerName==null)?"":reactionWheelControllerName;
+		switch (this.reactionWheelControllerName) {
 		case "ProportionalDerivativeLinearSunVectorController":
 			this.controller = new ProportionalDerivativeLinearSunVectorController();
 			break;
@@ -342,7 +351,13 @@ public class Satellite {
 			break;
 			
 		default:
-			this.controller = new NopeController();
+			{
+				if (Boolean.valueOf((satelliteConfiguration != null)?satelliteConfiguration.getProperty("thruster", "true"):"true")) {
+					this.controller = new ProportionalNonLinearAngularVelocitySDREController(this);
+				} else {
+					this.controller = new NopeController();
+				}
+			}
 		}
 
 		if (!"SetOfMagnetorquersController".equals(magnetorqueControllerName)) {
@@ -457,6 +472,15 @@ public class Satellite {
 		return setOfReactionWheels;
 	}
 
+
+	/**
+	 * Set of thrusters exposed.
+	 * 
+	 * @return
+	 */
+	public SetOfThrusters getSetOfThrusters() {
+		return setOfThrusters;
+	}
 	/**
 	 * telemetry methods - sun error.
 	 * 
@@ -662,9 +686,7 @@ public class Satellite {
 				+ ",\n modeUsingAttitude="
 				+ modeUsingAttitude 
 				+ ",\n reactionWheelControllerName="
-				+ reactionWheelControllerName 
-				+ "\n, reactionWheelHardNonlinearities=" 
-				+ reactionWheelHardNonlinearities + "]";
+				+ reactionWheelControllerName + "]";
 	}
 	
 	
@@ -741,8 +763,6 @@ public class Satellite {
 			if (other.reactionWheelControllerName != null)
 				return false;
 		} else if (!reactionWheelControllerName.equals(other.reactionWheelControllerName))
-			return false;
-		if (reactionWheelHardNonlinearities != other.reactionWheelHardNonlinearities)
 			return false;
 		return true;
 	}

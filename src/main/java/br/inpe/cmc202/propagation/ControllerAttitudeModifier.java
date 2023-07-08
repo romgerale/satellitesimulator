@@ -116,6 +116,7 @@ public class ControllerAttitudeModifier implements AttitudeProviderModifier {
 					"Control torque for ReactionWheels is undefined!");
 		}
 
+		// actuate MAGNETORQUER
 		if (satellite.getSetOfMagnetorquerController() != null) {
 			// compute control torque of magnetometers
 			final Vector3D controlTorqueM = satellite
@@ -136,10 +137,15 @@ public class ControllerAttitudeModifier implements AttitudeProviderModifier {
 			}
 		}
 
-		// actuate
+		// actuate REACTIONWHEELS
 		if (satellite.getSetOfReactionWheels() != null) {
 			satellite.getSetOfReactionWheels().actuate(controlTorque, dt,
 					previousSetOfReactionWheelsState);
+		}
+
+		// actuate THRUSTERS
+		if (satellite.getSetOfThrusters() != null) {
+			satellite.getSetOfThrusters().actuate(controlTorque);
 		}
 
 		// propagate

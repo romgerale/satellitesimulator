@@ -107,6 +107,8 @@ public class StepHandler implements OrekitFixedStepHandler {
 	final Map<Double, double[]> reactionWheelDesiredTorque = new TreeMap<Double, double[]>();
 	// ADDITIONAL - ExternalTorque.
 	final Map<Double, double[]> externalTorque = new TreeMap<Double, double[]>();
+	// ADDITIONAL - Thrusters torque.
+	final Map<Double, double[]> thrusterTorque = new TreeMap<Double, double[]>();
 
 	// to check intervalToStore
 	final long intervalToStore;
@@ -347,6 +349,14 @@ public class StepHandler implements OrekitFixedStepHandler {
 			
 			//external torque
 			this.externalTorque.put(currentState.getDate().durationFrom(startTime), satellite.getCurrentExternalTorque().toArray());
+
+			// thrusters torque
+			if (satellite.getSetOfThrusters() != null) {
+				thrusterTorque.put(
+						currentState.getDate().durationFrom(startTime),
+						satellite.getSetOfThrusters().getState()
+								.getControlTorque().toArray());
+			}
 			
 			lastStoredTime = currentState.getDate().durationFrom(startTime);
 
@@ -491,6 +501,12 @@ public class StepHandler implements OrekitFixedStepHandler {
 
 		// ADDITIONAL - EXTERNAL TORQUE
 		Plotter.plot3DScatter(externalTorque, "26. external Torque");
+
+		// ADDITIONAL - THRUSTER TORQUE
+		Plotter.plot2DLine(thrusterTorque,
+				"27. thruster torque - BODY ("
+						+ this.satellite.getController().getClass()
+								.getSimpleName() + ")", false, "N.m");
 
 		// ADDITIONAL - 3D satellite attitude visualizer
 		try {

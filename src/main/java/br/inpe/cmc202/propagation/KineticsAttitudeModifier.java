@@ -82,13 +82,19 @@ public class KineticsAttitudeModifier implements AttitudeProviderModifier {
 		// external torque
 		RealVector externalTorque = this.satellite.getCurrentAndPrepareNextExternalTorque();
 
-		// magnetorquer
+		// magnetorquers,
+		// thrusters
 		// and external torques in the center of mass
 		// I_b^{-1}g_{cm}
 		RealVector firstComponent = new ArrayRealVector(3, 0);
 		if (satellite.getSetOfMagnetorquer() != null) {
 			firstComponent = satellite.getI_inverse().operate(
 					new ArrayRealVector(satellite.getSetOfMagnetorquer()
+							.getState().getControlTorque().toArray())
+							.add(externalTorque));
+		} else 	if (satellite.getSetOfThrusters() != null) {
+			firstComponent = satellite.getI_inverse().operate(
+					new ArrayRealVector(satellite.getSetOfThrusters()
 							.getState().getControlTorque().toArray())
 							.add(externalTorque));
 		} else {

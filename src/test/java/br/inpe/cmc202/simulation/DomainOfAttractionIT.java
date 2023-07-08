@@ -60,14 +60,16 @@ public class DomainOfAttractionIT {
 		logger.info(" CONASAT");
 		final Satellite sat = new Satellite(null, "NopeController", null, loadSatelliteConfiguration("conasat"),
 				null);
-		final RealVector maxAngVelocity = sat.getMaximumAngularVelocityControllableByReactionWheels();
-		logger.info(" Maximum Satellite angular velocity r/s: {}", maxAngVelocity.toString());
-
-		logger.info(" Maximum Satellite angular velocity degrees/s: X={} Y={} Z={}",
-				FastMath.toDegrees(maxAngVelocity.getEntry(0)), FastMath.toDegrees(maxAngVelocity.getEntry(1)),
-				FastMath.toDegrees(maxAngVelocity.getEntry(2)));
-
-		logger.info(" NORM L2 - Maximum Satellite angular velocity r/s: {}", maxAngVelocity.getNorm());
-
+		
+		if (sat.getSetOfReactionWheels() != null) {
+			final RealVector maxAngVelocity = sat.getMaximumAngularVelocityControllableByReactionWheels();
+			logger.info(" Maximum Satellite angular velocity r/s: {}", maxAngVelocity.toString());
+	
+			logger.info(" Maximum Satellite angular velocity degrees/s: X={} Y={} Z={}",
+					FastMath.toDegrees(maxAngVelocity.getEntry(0)), FastMath.toDegrees(maxAngVelocity.getEntry(1)),
+					FastMath.toDegrees(maxAngVelocity.getEntry(2)));
+	
+			logger.info(" NORM L2 - Maximum Satellite angular velocity r/s: {}", maxAngVelocity.getNorm());
+		}
 	}
 }
